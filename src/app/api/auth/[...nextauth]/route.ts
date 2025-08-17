@@ -16,7 +16,11 @@ const handler = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, account, profile }: any) {
+    async jwt({ token, account, profile }: {
+      token: any;
+      account: any;
+      profile: any;
+    }) {
       if (account) {
         token.accessToken = account.access_token
         token.refreshToken = account.refresh_token
@@ -27,7 +31,10 @@ const handler = NextAuth({
       }
       return token
     },
-    async session({ session, token }: any) {
+    async session({ session, token }: {
+      session: any;
+      token: any;
+    }) {
       session.accessToken = token.accessToken
       session.user.id = token.sub!
       return session
