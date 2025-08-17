@@ -1,0 +1,47 @@
+name: Validate Supabase migrations
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      LOCAL_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install Supabase CLI
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Apply migrations to disposable Postgres
+      - name: Push migrations to ephemeral DB
+        run: supabase db push --db-url "${LOCAL_DB_URL}"
+
+      # (Optional) Dump snapshot for review artifacts
+      - name: Dump schema snapshot
+        run: supabase db dump --db-url "${LOCAL_DB_URL}" --schema-only > db/schema.sql
+
+      - name: Upload schema snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: schema-snapshot
+          path: db/schema.sql
