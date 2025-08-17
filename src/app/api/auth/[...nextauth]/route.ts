@@ -1,26 +1,22 @@
 import NextAuth from 'next-auth'
-import GoogleProvider from 'next-auth/providers/google'
+import Google from 'next-auth/providers/google'
 
 const handler = NextAuth({
   providers: [
-    GoogleProvider({
+    Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
           scope: 'openid email profile https://www.googleapis.com/auth/youtube.readonly',
-          access_type: 'offline', // Enable refresh tokens
-          prompt: 'consent', // Force consent screen to ensure refresh token
+          access_type: 'offline',
+          prompt: 'consent',
         },
       },
     }),
   ],
-  session: {
-    strategy: 'jwt',
-  },
   callbacks: {
-    async jwt({ token, account, profile }) {
-      // Persist the OAuth access_token and or the user id to the token right after signin
+    async jwt({ token, account, profile }: any) {
       if (account) {
         token.accessToken = account.access_token
         token.refreshToken = account.refresh_token
@@ -31,8 +27,7 @@ const handler = NextAuth({
       }
       return token
     },
-    async session({ session, token }) {
-      // Send properties to the client, like an access_token and user id from a provider.
+    async session({ session, token }: any) {
       session.accessToken = token.accessToken
       session.user.id = token.sub!
       return session
