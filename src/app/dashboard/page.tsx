@@ -1,4 +1,5 @@
 'use client'
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useSession, signOut } from 'next-auth/react'
 import { useEffect, useState } from 'react'
@@ -87,7 +88,7 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <dt className="text-sm font-medium text-gray-500">User ID</dt>
-                    <dd className="mt-1 text-sm text-gray-900 font-mono">{session.user?.id}</dd>
+                    <dd className="mt-1 text-sm text-gray-900 font-mono">{(session.user as any)?.id}</dd>
                   </div>
                 </div>
               </div>

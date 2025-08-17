@@ -1,4 +1,5 @@
-import NextAuth from 'next-auth'
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import NextAuth from 'next-auth/next'
 import GoogleProvider from 'next-auth/providers/google'
 
 const handler = NextAuth({
@@ -31,7 +32,7 @@ const handler = NextAuth({
       }
       return token
     },
-    async session({ session, token }) {
+    async session({ session, token }: any) {
       // Send properties to the client, like an access_token and user id from a provider.
       session.accessToken = token.accessToken
       session.user.id = token.sub!
