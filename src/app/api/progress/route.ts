@@ -1,7 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
+import NextAuth from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+
+const getServerSession = (NextAuth as any).getServerSession as (opts: any) => Promise<any>
 
 export async function GET(request: NextRequest) {
   try {
