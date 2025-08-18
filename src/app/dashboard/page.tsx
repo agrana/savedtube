@@ -1,18 +1,81 @@
 'use client'
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useSession, signOut } from 'next-auth/react'
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
+
+interface Playlist {
+  id: string
+  snippet: {
+    title: string
+    description: string
+    thumbnails: {
+      default: { url: string }
+      medium: { url: string }
+      high: { url: string }
+    }
+    channelTitle: string
+  }
+  contentDetails: {
+    itemCount: number
+  }
+}
 
 export default function Dashboard() {
   const { data: session, status } = useSession()
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [playlists, setPlaylists] = useState<Playlist[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isLoadingPlaylists, setIsLoadingPlaylists] = useState(false)
 
   useEffect(() => {
     if (status !== 'loading') {
       setIsLoading(false)
+      
+      // Check for token refresh errors
+      if ((session as any)?.error === 'RefreshAccessTokenError') {
+        setError('Your session has expired. Please sign in again.')
+      }
     }
-  }, [status])
+  }, [status, session])
+
+  // Fetch playlists when session is available
+  useEffect(() => {
+    if ((session as any)?.accessToken) {
+      fetchPlaylists()
+    }
+  }, [session])
+
+  const fetchPlaylists = async (query = '') => {
+    setIsLoadingPlaylists(true)
+    try {
+      const params = new URLSearchParams()
+      if (query) {
+        params.append('q', query)
+      }
+      
+      const response = await fetch(`/api/playlists?${params.toString()}`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch playlists')
+      }
+      
+      const data = await response.json()
+      setPlaylists(data.playlists || [])
+    } catch (error) {
+      console.error('Error fetching playlists:', error)
+      setError('Failed to load playlists')
+    } finally {
+      setIsLoadingPlaylists(false)
+    }
+  }
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    fetchPlaylists(searchQuery)
+  }
 
   if (isLoading) {
     return (
@@ -28,6 +91,23 @@ export default function Dashboard() {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
           <p className="text-gray-600">Please sign in to access the dashboard.</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-900 mb-4">Authentication Error</h1>
+          <p className="text-red-600 mb-4">{error}</p>
+          <button
+            onClick={() => signOut({ callbackUrl: '/' })}
+            className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+          >
+            Sign in again
+          </button>
         </div>
       </div>
     )
@@ -69,103 +149,69 @@ export default function Dashboard() {
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {/* User Profile Card */}
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
-                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-                  User Profile
-                </h3>
-                <div className="space-y-3">
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Name</dt>
-                    <dd className="mt-1 text-sm text-gray-900">{session.user?.name}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Email</dt>
-                    <dd className="mt-1 text-sm text-gray-900">{session.user?.email}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">User ID</dt>
-                    <dd className="mt-1 text-sm text-gray-900 font-mono">{session.user?.id}</dd>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Authentication Status */}
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
-                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-                  Authentication Status
-                </h3>
-                <div className="space-y-3">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <div className="h-2 w-2 bg-green-400 rounded-full"></div>
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-900">Authenticated</p>
-                      <p className="text-sm text-gray-500">Google OAuth with YouTube scope</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <div className="h-2 w-2 bg-blue-400 rounded-full"></div>
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-900">YouTube Access</p>
-                      <p className="text-sm text-gray-500">Read-only access to playlists</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+          {/* Search Bar */}
+          <div className="mb-6">
+            <form onSubmit={handleSearch} className="flex gap-2">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search playlists..."
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <button
+                type="submit"
+                disabled={isLoadingPlaylists}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+              >
+                {isLoadingPlaylists ? 'Searching...' : 'Search'}
+              </button>
+            </form>
           </div>
 
-          {/* Next Steps */}
-          <div className="mt-8 bg-white overflow-hidden shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-                Next Steps
-              </h3>
-              <div className="space-y-4">
-                <div className="flex items-start">
-                  <div className="flex-shrink-0">
-                    <div className="h-6 w-6 bg-blue-100 rounded-full flex items-center justify-center">
-                      <span className="text-blue-600 text-xs font-medium">1</span>
-                    </div>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-900">Sync YouTube Playlists</p>
-                    <p className="text-sm text-gray-500">Fetch and store your saved playlists from YouTube</p>
-                  </div>
-                </div>
-                <div className="flex items-start">
-                  <div className="flex-shrink-0">
-                    <div className="h-6 w-6 bg-gray-100 rounded-full flex items-center justify-center">
-                      <span className="text-gray-600 text-xs font-medium">2</span>
-                    </div>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-900">Build Player Interface</p>
-                    <p className="text-sm text-gray-500">Create distraction-free video player</p>
-                  </div>
-                </div>
-                <div className="flex items-start">
-                  <div className="flex-shrink-0">
-                    <div className="h-6 w-6 bg-gray-100 rounded-full flex items-center justify-center">
-                      <span className="text-gray-600 text-xs font-medium">3</span>
-                    </div>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-900">Add AI Tagging</p>
-                    <p className="text-sm text-gray-500">Automatically categorize and search videos</p>
-                  </div>
-                </div>
-              </div>
+          {/* Playlists Grid */}
+          {isLoadingPlaylists ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
             </div>
-          </div>
+          ) : playlists.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {playlists.map((playlist) => (
+                <Link
+                  key={playlist.id}
+                  href={`/p/${playlist.id}`}
+                  className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden"
+                >
+                  <div className="aspect-video relative">
+                    <Image
+                      src={playlist.snippet.thumbnails.medium.url}
+                      alt={playlist.snippet.title}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-semibold text-gray-900 line-clamp-2 mb-2">
+                      {playlist.snippet.title}
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-2">
+                      {playlist.snippet.channelTitle}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {playlist.contentDetails.itemCount} videos
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No playlists found</h3>
+              <p className="text-gray-600">
+                {searchQuery ? 'Try a different search term.' : 'You don\'t have any playlists yet.'}
+              </p>
+            </div>
+          )}
         </div>
       </main>
     </div>
