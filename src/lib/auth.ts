@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import GoogleProvider from 'next-auth/providers/google'
+import Google from 'next-auth/providers/google'
 
 /**
  * Takes a token, and returns a new token with updated
@@ -50,7 +50,7 @@ async function refreshAccessToken(token: any) {
 
 export const authOptions = {
   providers: [
-    GoogleProvider({
+    Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
