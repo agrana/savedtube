@@ -8,12 +8,18 @@ import Image from 'next/image'
 export default function Dashboard() {
   const { data: session, status } = useSession()
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (status !== 'loading') {
       setIsLoading(false)
+      
+      // Check for token refresh errors
+      if ((session as any)?.error === 'RefreshAccessTokenError') {
+        setError('Your session has expired. Please sign in again.')
+      }
     }
-  }, [status])
+  }, [status, session])
 
   if (isLoading) {
     return (
@@ -29,6 +35,23 @@ export default function Dashboard() {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
           <p className="text-gray-600">Please sign in to access the dashboard.</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-900 mb-4">Authentication Error</h1>
+          <p className="text-red-600 mb-4">{error}</p>
+          <button
+            onClick={() => signOut({ callbackUrl: '/' })}
+            className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+          >
+            Sign in again
+          </button>
         </div>
       </div>
     )
