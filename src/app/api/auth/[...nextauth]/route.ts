@@ -1,6 +1,7 @@
-import handlers from 'next-auth/next'
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import NextAuth from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
-const { GET, POST } = handlers(authOptions)
+const handler = (NextAuth as any)(authOptions)
 
-export { GET, POST }
+export { handler as GET, handler as POST }
