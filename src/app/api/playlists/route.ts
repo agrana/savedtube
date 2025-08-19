@@ -1,16 +1,18 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server'
-import NextAuth from 'next-auth'
+import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-
-const getServerSession = (NextAuth as any).getServerSession as (opts: any) => Promise<any>
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('Playlists API called')
+    
     // Get user session with access token
     const session = await getServerSession(authOptions)
+    console.log('Session retrieved:', { hasSession: !!session, hasAccessToken: !!session?.accessToken })
     
     if (!session?.accessToken) {
+      console.error('No session or access token found:', { session: !!session, hasAccessToken: !!session?.accessToken })
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -47,9 +49,9 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       const error = await response.text()
-      console.error('YouTube API error:', error)
+      console.error('YouTube API error:', { status: response.status, error })
       return NextResponse.json(
-        { error: 'Failed to fetch playlists' },
+        { error: 'Failed to fetch playlists from YouTube API' },
         { status: response.status }
       )
     }
@@ -65,7 +67,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching playlists:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     )
   }
