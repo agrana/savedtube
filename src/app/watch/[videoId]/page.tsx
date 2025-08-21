@@ -1,10 +1,10 @@
 'use client'
 
 import { useSession } from 'next-auth/react'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { YouTubePlayer } from '@/components/YouTubePlayer'
+import { YouTubePlayer } from '../../../components/YouTubePlayer'
 
 interface PlaylistItem {
   id: string
@@ -44,6 +44,37 @@ export default function WatchPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const fetchPlaylistItems = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/playlist-items?playlistId=${playlistId}`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch playlist items')
+      }
+      
+      const data = await response.json()
+      setPlaylistItems(data.items || [])
+    } catch (error) {
+      console.error('Error fetching playlist items:', error)
+      setError('Failed to load playlist')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [playlistId])
+
+  const fetchProgress = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/progress?playlistId=${playlistId}`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch progress')
+      }
+      
+      const data = await response.json()
+      setProgress(data.progress || [])
+    } catch (error) {
+      console.error('Error fetching progress:', error)
+    }
+  }, [playlistId])
+
   useEffect(() => {
     if (status === 'loading') return
     
@@ -56,7 +87,21 @@ export default function WatchPage() {
       fetchPlaylistItems()
       fetchProgress()
     }
-  }, [session, status, playlistId])
+  }, [session, status, playlistId, fetchPlaylistItems, fetchProgress, router])
+
+  useEffect(() => {
+    if (status === 'loading') return
+    
+    if (!session) {
+      router.push('/')
+      return
+    }
+
+    if (playlistId) {
+      fetchPlaylistItems()
+      fetchProgress()
+    }
+  }, [session, status, playlistId, fetchPlaylistItems, fetchProgress, router])
 
   useEffect(() => {
     if (playlistItems.length > 0) {
@@ -97,37 +142,6 @@ export default function WatchPage() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [currentIndex, playlistItems, playlistId, router])
-
-  const fetchPlaylistItems = async () => {
-    try {
-      const response = await fetch(`/api/playlist-items?playlistId=${playlistId}`)
-      if (!response.ok) {
-        throw new Error('Failed to fetch playlist items')
-      }
-      
-      const data = await response.json()
-      setPlaylistItems(data.items || [])
-    } catch (error) {
-      console.error('Error fetching playlist items:', error)
-      setError('Failed to load playlist')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const fetchProgress = async () => {
-    try {
-      const response = await fetch(`/api/progress?playlistId=${playlistId}`)
-      if (!response.ok) {
-        throw new Error('Failed to fetch progress')
-      }
-      
-      const data = await response.json()
-      setProgress(data.progress || [])
-    } catch (error) {
-      console.error('Error fetching progress:', error)
-    }
-  }
 
   const markAsWatched = async (videoId: string) => {
     try {
@@ -183,9 +197,7 @@ export default function WatchPage() {
     }
   }
 
-  const isWatched = (videoId: string) => {
-    return progress.find(p => p.video_id === videoId)?.watched || false
-  }
+
 
   if (status === 'loading' || isLoading) {
     return (

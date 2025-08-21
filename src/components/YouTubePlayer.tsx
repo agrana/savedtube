@@ -2,32 +2,43 @@
 
 import { useEffect, useRef, useState } from 'react'
 
+interface YouTubePlayerEvent {
+  data: number
+}
+
+interface YouTubePlayerConfig {
+  height: string
+  width: string
+  videoId: string
+  playerVars: {
+    modestbranding?: number
+    controls?: number
+    rel?: number
+    iv_load_policy?: number
+    playsinline?: number
+    enablejsapi?: number
+    origin?: string
+    showinfo?: number
+    fs?: number
+    autoplay?: number
+    mute?: number
+    [key: string]: number | string | undefined
+  }
+  events?: {
+    onReady?: (event: YouTubePlayerEvent) => void
+    onStateChange?: (event: YouTubePlayerEvent) => void
+    onError?: (event: YouTubePlayerEvent) => void
+  }
+}
+
+interface YouTubePlayerInstance {
+  destroy: () => void
+}
+
 declare global {
   interface Window {
     YT: {
-      Player: new (
-        elementId: string,
-        config: {
-          height: string
-          width: string
-          videoId: string
-          playerVars: {
-            modestbranding?: number
-            controls?: number
-            rel?: number
-            iv_load_policy?: number
-            playsinline?: number
-            enablejsapi?: number
-            origin?: string
-            [key: string]: any
-          }
-          events?: {
-            onReady?: (event: any) => void
-            onStateChange?: (event: any) => void
-            onError?: (event: any) => void
-          }
-        }
-      ) => any
+      Player: new (elementId: string, config: YouTubePlayerConfig) => YouTubePlayerInstance
       PlayerState: {
         ENDED: number
         PLAYING: number
@@ -45,8 +56,7 @@ interface YouTubePlayerProps {
   onEnd?: () => void
   onPlay?: () => void
   onPause?: () => void
-  onError?: (error: any) => void
-  onFullscreenChange?: (isFullscreen: boolean) => void
+  onError?: (error: YouTubePlayerEvent) => void
 }
 
 export function YouTubePlayer({ 
@@ -54,10 +64,9 @@ export function YouTubePlayer({
   onEnd, 
   onPlay, 
   onPause, 
-  onError,
-  onFullscreenChange
+  onError
 }: YouTubePlayerProps) {
-  const playerRef = useRef<any>(null)
+  const playerRef = useRef<YouTubePlayerInstance | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [isPlayerReady, setIsPlayerReady] = useState(false)
   const [isYouTubeAPIReady, setIsYouTubeAPIReady] = useState(false)
@@ -106,10 +115,10 @@ export function YouTubePlayer({
         mute: 0, // Not muted
       },
       events: {
-        onReady: (event) => {
+        onReady: () => {
           setIsPlayerReady(true)
         },
-        onStateChange: (event) => {
+        onStateChange: (event: YouTubePlayerEvent) => {
           switch (event.data) {
             case window.YT.PlayerState.ENDED:
               onEnd?.()
@@ -122,7 +131,7 @@ export function YouTubePlayer({
               break
           }
         },
-        onError: (event) => {
+        onError: (event: YouTubePlayerEvent) => {
           console.error('YouTube player error:', event)
           onError?.(event)
         },
@@ -134,7 +143,7 @@ export function YouTubePlayer({
         playerRef.current.destroy()
       }
     }
-  }, [videoId, isYouTubeAPIReady, onEnd, onPlay, onPause, onError])
+  }, [videoId, isYouTubeAPIReady, onEnd, onPlay, onPause, onError, playerId])
 
   return (
     <div className="relative w-full h-0 pb-[56.25%] bg-black">
