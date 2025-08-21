@@ -5,10 +5,13 @@ A distraction-free YouTube playlist player built with Next.js, Supabase, and Goo
 ## Features
 
 - 🔐 Secure Google OAuth authentication with YouTube API access
-- 🎯 Distraction-free video player interface
+- 🎯 Distraction-free video player interface with YouTube IFrame Player API
+- 🎮 Keyboard shortcuts for navigation (← → arrows, Esc to exit)
 - 📱 Responsive design with modern UI
 - 🔒 Row Level Security (RLS) for data protection
 - 🚀 Deployed on Vercel with Supabase backend
+- 📊 Progress tracking for watched videos
+- 🎬 Playlist navigation with minimal distractions
 
 ## Tech Stack
 
@@ -143,13 +146,30 @@ The application uses a secure `profiles` table with:
 - RLS policies for data isolation
 - Indexes for performance optimization
 
+## Video Player Features
+
+The distraction-free video player includes:
+
+- **YouTube IFrame Player API**: Compliant with YouTube Terms of Service
+- **Minimal UI**: No sidebars, comments, or recommendations
+- **Distraction-Reducing Parameters**:
+  - `modestbranding=1`: Reduces YouTube branding
+  - `rel=0`: Limits related videos to same channel
+  - `iv_load_policy=3`: Disables video annotations
+  - `showinfo=0`: Hides video title and uploader info
+- **Keyboard Navigation**: 
+  - Left/Right arrows: Navigate between videos
+  - Escape: Return to playlist
+- **Progress Tracking**: Automatic marking of watched videos
+- **Responsive Design**: Works on desktop and mobile devices
+
 ## Next Steps
 
-1. **YouTube API Integration**: Fetch user playlists and videos
-2. **Video Player**: Build distraction-free player interface
-3. **AI Tagging**: Add automatic video categorization
-4. **Search & Filter**: Implement advanced search functionality
-5. **Sharing**: Add playlist sharing features
+1. **AI Tagging**: Add automatic video categorization
+2. **Search & Filter**: Implement advanced search functionality
+3. **Sharing**: Add playlist sharing features
+4. **Custom Playlists**: Allow users to create their own playlists
+5. **Offline Support**: Cache videos for offline viewing
 
 ## Contributing
 

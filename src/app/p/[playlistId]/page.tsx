@@ -192,7 +192,7 @@ export default function PlaylistPage() {
         <div className="px-4 py-6 sm:px-0">
           {items.length > 0 ? (
             <div className="space-y-4">
-              {items.map((item, index) => {
+              {items.map((item) => {
                 const watched = isWatched(item.contentDetails.videoId)
                 return (
                   <div
