@@ -205,7 +205,15 @@ export default function PlaylistPage() {
           {items.length > 0 ? (
             <div className="space-y-4">
               {items.map((item) => {
-                const watched = isWatched(item.contentDetails.videoId);
+                // Skip items that don't have required properties
+                if (!item?.snippet?.title || !item?.contentDetails?.videoId) {
+                  return null;
+                }
+
+                const watched = progress.some(
+                  (p) => p.video_id === item.contentDetails.videoId
+                );
+
                 return (
                   <div
                     key={item.id}
@@ -216,7 +224,11 @@ export default function PlaylistPage() {
                     <div className="flex-shrink-0">
                       <div className="relative w-32 h-20">
                         <Image
-                          src={item.snippet.thumbnails.medium.url}
+                          src={
+                            item.snippet.thumbnails?.medium?.url ||
+                            item.snippet.thumbnails?.default?.url ||
+                            'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIwIiBoZWlnaHQ9IjE4MCIgdmlld0JveD0iMCAwIDMyMCAxODAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMjAiIGhlaWdodD0iMTgwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xNjAgOTBDMTQzLjQzMSA5MCAxMzAgMTAzLjQzMSAxMzAgMTIwQzEzMCAxMzYuNTY5IDE0My40MzEgMTUwIDE2MCAxNTBDMTc2LjU2OSAxNTAgMTkwIDEzNi41NjkgMTkwIDEyMEMxOTAgMTAzLjQzMSAxNzYuNTY5IDkwIDE2MCA5MFoiIGZpbGw9IiM5Q0EzQUYiLz4KPHBhdGggZD0iTTE0MCAxMzBMMTcwIDEyMEwxNDAgMTEwVjEzMFoiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPgo='
+                          }
                           alt={item.snippet.title}
                           fill
                           className="object-cover rounded"
@@ -229,12 +241,14 @@ export default function PlaylistPage() {
                         {item.snippet.title}
                       </h3>
                       <p className="text-sm text-gray-600">
-                        {item.snippet.channelTitle}
+                        {item.snippet.channelTitle || 'Unknown Channel'}
                       </p>
                       <p className="text-sm text-gray-500">
-                        {new Date(
-                          item.snippet.publishedAt
-                        ).toLocaleDateString()}
+                        {item.snippet.publishedAt
+                          ? new Date(
+                              item.snippet.publishedAt
+                            ).toLocaleDateString()
+                          : 'Unknown Date'}
                       </p>
                     </div>
 
