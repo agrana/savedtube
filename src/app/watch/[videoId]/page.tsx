@@ -1,210 +1,147 @@
-'use client'
+'use client';
 
-import { useSession } from 'next-auth/react'
-import { useEffect, useState, useCallback } from 'react'
-import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
-import { YouTubePlayer } from '../../../components/YouTubePlayer'
+import { useSession } from 'next-auth/react';
+import { useEffect, useState, useCallback } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { YouTubePlayer } from '../../../components/YouTubePlayer';
 
 interface PlaylistItem {
-  id: string
+  id: string;
   snippet: {
-    title: string
-    description: string
+    title: string;
+    description: string;
     thumbnails: {
-      default: { url: string }
-      medium: { url: string }
-      high: { url: string }
-    }
-    channelTitle: string
-    publishedAt: string
-  }
+      default: { url: string };
+      medium: { url: string };
+      high: { url: string };
+    };
+    channelTitle: string;
+    publishedAt: string;
+  };
   contentDetails: {
-    videoId: string
-  }
-}
-
-interface Progress {
-  video_id: string
-  watched: boolean
-  watched_at: string | null
+    videoId: string;
+  };
 }
 
 export default function WatchPage() {
-  const { data: session, status } = useSession()
-  const params = useParams()
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const videoId = params.videoId as string
-  const playlistId = searchParams.get('playlistId')
+  const { data: session, status } = useSession();
+  const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const videoId = params.videoId as string;
+  const playlistId = searchParams.get('playlistId');
 
-  const [playlistItems, setPlaylistItems] = useState<PlaylistItem[]>([])
-  const [progress, setProgress] = useState<Progress[]>([])
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [playlistItems, setPlaylistItems] = useState<PlaylistItem[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchPlaylistItems = useCallback(async () => {
     try {
-      const response = await fetch(`/api/playlist-items?playlistId=${playlistId}`)
+      const response = await fetch(
+        `/api/playlist-items?playlistId=${playlistId}`
+      );
       if (!response.ok) {
-        throw new Error('Failed to fetch playlist items')
+        throw new Error('Failed to fetch playlist items');
       }
-      
-      const data = await response.json()
-      setPlaylistItems(data.items || [])
+
+      const data = await response.json();
+      setPlaylistItems(data.items || []);
     } catch (error) {
-      console.error('Error fetching playlist items:', error)
-      setError('Failed to load playlist')
+      console.error('Error fetching playlist items:', error);
+      setError('Failed to load playlist');
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [playlistId])
-
-  const fetchProgress = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/progress?playlistId=${playlistId}`)
-      if (!response.ok) {
-        throw new Error('Failed to fetch progress')
-      }
-      
-      const data = await response.json()
-      setProgress(data.progress || [])
-    } catch (error) {
-      console.error('Error fetching progress:', error)
-    }
-  }, [playlistId])
+  }, [playlistId]);
 
   useEffect(() => {
-    if (status === 'loading') return
-    
+    if (status === 'loading') return;
+
     if (!session) {
-      router.push('/')
-      return
+      router.push('/');
+      return;
     }
 
     if (playlistId) {
-      fetchPlaylistItems()
-      fetchProgress()
+      fetchPlaylistItems();
     }
-  }, [session, status, playlistId, fetchPlaylistItems, fetchProgress, router])
-
-  useEffect(() => {
-    if (status === 'loading') return
-    
-    if (!session) {
-      router.push('/')
-      return
-    }
-
-    if (playlistId) {
-      fetchPlaylistItems()
-      fetchProgress()
-    }
-  }, [session, status, playlistId, fetchPlaylistItems, fetchProgress, router])
+  }, [session, status, playlistId, fetchPlaylistItems, router]);
 
   useEffect(() => {
     if (playlistItems.length > 0) {
-      const index = playlistItems.findIndex(item => item.contentDetails.videoId === videoId)
-      setCurrentIndex(index >= 0 ? index : 0)
+      const index = playlistItems.findIndex(
+        (item) => item.contentDetails.videoId === videoId
+      );
+      setCurrentIndex(index >= 0 ? index : 0);
     }
-  }, [playlistItems, videoId])
+  }, [playlistItems, videoId]);
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
-        return // Don't handle shortcuts when typing in input fields
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement
+      ) {
+        return; // Don't handle shortcuts when typing in input fields
       }
 
       switch (event.key) {
         case 'ArrowLeft':
-          event.preventDefault()
+          event.preventDefault();
           if (currentIndex > 0) {
-            const prevItem = playlistItems[currentIndex - 1]
-            router.push(`/watch/${prevItem.contentDetails.videoId}?playlistId=${playlistId}`)
+            const prevItem = playlistItems[currentIndex - 1];
+            router.push(
+              `/watch/${prevItem.contentDetails.videoId}?playlistId=${playlistId}`
+            );
           }
-          break
+          break;
         case 'ArrowRight':
-          event.preventDefault()
+          event.preventDefault();
           if (currentIndex < playlistItems.length - 1) {
-            const nextItem = playlistItems[currentIndex + 1]
-            router.push(`/watch/${nextItem.contentDetails.videoId}?playlistId=${playlistId}`)
+            const nextItem = playlistItems[currentIndex + 1];
+            router.push(
+              `/watch/${nextItem.contentDetails.videoId}?playlistId=${playlistId}`
+            );
           }
-          break
+          break;
         case 'Escape':
-          event.preventDefault()
-          router.push(`/p/${playlistId}`)
-          break
+          event.preventDefault();
+          router.push(`/p/${playlistId}`);
+          break;
       }
-    }
+    };
 
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentIndex, playlistItems, playlistId, router])
-
-  const markAsWatched = async (videoId: string) => {
-    try {
-      const response = await fetch('/api/progress', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          playlistId,
-          videoId,
-          watched: true,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to update progress')
-      }
-
-      // Update local state
-      setProgress(prev => {
-        const existing = prev.find(p => p.video_id === videoId)
-        if (existing) {
-          return prev.map(p => 
-            p.video_id === videoId 
-              ? { ...p, watched: true, watched_at: new Date().toISOString() }
-              : p
-          )
-        } else {
-          return [...prev, {
-            video_id: videoId,
-            watched: true,
-            watched_at: new Date().toISOString(),
-          }]
-        }
-      })
-    } catch (error) {
-      console.error('Error updating progress:', error)
-    }
-  }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentIndex, playlistItems, playlistId, router]);
 
   const goToNext = () => {
     if (currentIndex < playlistItems.length - 1) {
-      const nextItem = playlistItems[currentIndex + 1]
-      router.push(`/watch/${nextItem.contentDetails.videoId}?playlistId=${playlistId}`)
+      const nextItem = playlistItems[currentIndex + 1];
+      router.push(
+        `/watch/${nextItem.contentDetails.videoId}?playlistId=${playlistId}`
+      );
     }
-  }
+  };
 
   const goToPrevious = () => {
     if (currentIndex > 0) {
-      const prevItem = playlistItems[currentIndex - 1]
-      router.push(`/watch/${prevItem.contentDetails.videoId}?playlistId=${playlistId}`)
+      const prevItem = playlistItems[currentIndex - 1];
+      router.push(
+        `/watch/${prevItem.contentDetails.videoId}?playlistId=${playlistId}`
+      );
     }
-  }
-
-
+  };
 
   if (status === 'loading' || isLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white"></div>
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -221,12 +158,12 @@ export default function WatchPage() {
           </Link>
         </div>
       </div>
-    )
+    );
   }
 
-  const currentItem = playlistItems[currentIndex]
-  const hasNext = currentIndex < playlistItems.length - 1
-  const hasPrevious = currentIndex > 0
+  const currentItem = playlistItems[currentIndex];
+  const hasNext = currentIndex < playlistItems.length - 1;
+  const hasPrevious = currentIndex > 0;
 
   return (
     <div className="min-h-screen bg-black">
@@ -251,13 +188,15 @@ export default function WatchPage() {
               </div>
             )}
           </div>
-          
+
           <div className="flex items-center space-x-4">
             <span className="text-white text-sm">
               {currentIndex + 1} of {playlistItems.length}
             </span>
             <div className="text-white text-xs opacity-70">
-              <span className="hidden sm:inline">← → to navigate, Esc to exit</span>
+              <span className="hidden sm:inline">
+                ← → to navigate, Esc to exit
+              </span>
             </div>
           </div>
         </div>
@@ -269,12 +208,10 @@ export default function WatchPage() {
           <YouTubePlayer
             videoId={videoId}
             onEnd={() => {
-              markAsWatched(videoId)
               if (hasNext) {
-                goToNext()
+                goToNext();
               }
             }}
-            onPlay={() => markAsWatched(videoId)}
           />
         </div>
       </div>
@@ -292,8 +229,18 @@ export default function WatchPage() {
             }`}
             title="Previous video"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
             </svg>
           </button>
 
@@ -311,12 +258,22 @@ export default function WatchPage() {
             }`}
             title="Next video"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
+              />
             </svg>
           </button>
         </div>
       </div>
     </div>
-  )
+  );
 }

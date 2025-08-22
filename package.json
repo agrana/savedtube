@@ -7,8 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "lint:fix": "next lint --fix",
     "type-check": "tsc --noEmit",
-    "test": "echo \"No tests specified yet\" && exit 0"
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "echo \"No tests specified yet\" && exit 0",
+    "prepare": "husky",
+    "pre-commit": "lint-staged"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.55.0",
@@ -25,7 +30,16 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.4.6",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.5",
+    "prettier": "^3.6.2",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
   }
 }

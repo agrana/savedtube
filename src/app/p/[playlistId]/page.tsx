@@ -1,89 +1,90 @@
-'use client'
-/* eslint-disable @typescript-eslint/no-explicit-any */
+'use client';
 
-import { useSession } from 'next-auth/react'
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import Image from 'next/image'
-import Link from 'next/link'
+import { useSession } from 'next-auth/react';
+import { useEffect, useState, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import Image from 'next/image';
+import Link from 'next/link';
 
 interface PlaylistItem {
-  id: string
+  id: string;
   snippet: {
-    title: string
-    description: string
+    title: string;
+    description: string;
     thumbnails: {
-      default: { url: string }
-      medium: { url: string }
-      high: { url: string }
-    }
-    channelTitle: string
-    publishedAt: string
-  }
+      default: { url: string };
+      medium: { url: string };
+      high: { url: string };
+    };
+    channelTitle: string;
+    publishedAt: string;
+  };
   contentDetails: {
-    videoId: string
-  }
+    videoId: string;
+  };
 }
 
 interface Progress {
-  video_id: string
-  watched: boolean
-  watched_at: string | null
+  video_id: string;
+  watched: boolean;
+  watched_at: string | null;
 }
 
 export default function PlaylistPage() {
-  const { data: session, status } = useSession()
-  const params = useParams()
-  const router = useRouter()
-  const playlistId = params.playlistId as string
+  const { data: session, status } = useSession();
+  const params = useParams();
+  const router = useRouter();
+  const playlistId = params.playlistId as string;
 
-  const [items, setItems] = useState<PlaylistItem[]>([])
-  const [progress, setProgress] = useState<Progress[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [items, setItems] = useState<PlaylistItem[]>([]);
+  const [progress, setProgress] = useState<Progress[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPlaylistItems = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `/api/playlist-items?playlistId=${playlistId}`
+      );
+      if (!response.ok) {
+        throw new Error('Failed to fetch playlist items');
+      }
+
+      const data = await response.json();
+      setItems(data.items || []);
+    } catch (error) {
+      console.error('Error fetching playlist items:', error);
+      setError('Failed to load playlist');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [playlistId]);
+
+  const fetchProgress = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/progress?playlistId=${playlistId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch progress');
+      }
+
+      const data = await response.json();
+      setProgress(data.progress || []);
+    } catch (error) {
+      console.error('Error fetching progress:', error);
+    }
+  }, [playlistId]);
 
   useEffect(() => {
-    if (status === 'loading') return
-    
+    if (status === 'loading') return;
+
     if (!session) {
-      router.push('/')
-      return
+      router.push('/');
+      return;
     }
 
-    fetchPlaylistItems()
-    fetchProgress()
-  }, [session, status, playlistId])
-
-  const fetchPlaylistItems = async () => {
-    try {
-      const response = await fetch(`/api/playlist-items?playlistId=${playlistId}`)
-      if (!response.ok) {
-        throw new Error('Failed to fetch playlist items')
-      }
-      
-      const data = await response.json()
-      setItems(data.items || [])
-    } catch (error) {
-      console.error('Error fetching playlist items:', error)
-      setError('Failed to load playlist')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const fetchProgress = async () => {
-    try {
-      const response = await fetch(`/api/progress?playlistId=${playlistId}`)
-      if (!response.ok) {
-        throw new Error('Failed to fetch progress')
-      }
-      
-      const data = await response.json()
-      setProgress(data.progress || [])
-    } catch (error) {
-      console.error('Error fetching progress:', error)
-    }
-  }
+    fetchPlaylistItems();
+    fetchProgress();
+  }, [session, status, playlistId, fetchPlaylistItems, fetchProgress, router]);
 
   const toggleWatched = async (videoId: string, currentlyWatched: boolean) => {
     try {
@@ -97,44 +98,53 @@ export default function PlaylistPage() {
           videoId,
           watched: !currentlyWatched,
         }),
-      })
+      });
 
       if (!response.ok) {
-        throw new Error('Failed to update progress')
+        throw new Error('Failed to update progress');
       }
 
       // Update local state
-      setProgress(prev => {
-        const existing = prev.find(p => p.video_id === videoId)
+      setProgress((prev) => {
+        const existing = prev.find((p) => p.video_id === videoId);
         if (existing) {
-          return prev.map(p => 
-            p.video_id === videoId 
-              ? { ...p, watched: !currentlyWatched, watched_at: !currentlyWatched ? new Date().toISOString() : null }
+          return prev.map((p) =>
+            p.video_id === videoId
+              ? {
+                  ...p,
+                  watched: !currentlyWatched,
+                  watched_at: !currentlyWatched
+                    ? new Date().toISOString()
+                    : null,
+                }
               : p
-          )
+          );
         } else {
-          return [...prev, {
-            video_id: videoId,
-            watched: !currentlyWatched,
-            watched_at: !currentlyWatched ? new Date().toISOString() : null,
-          }]
+          return [
+            ...prev,
+            {
+              video_id: videoId,
+              watched: !currentlyWatched,
+              watched_at: !currentlyWatched ? new Date().toISOString() : null,
+            },
+          ];
         }
-      })
+      });
     } catch (error) {
-      console.error('Error updating progress:', error)
+      console.error('Error updating progress:', error);
     }
-  }
+  };
 
   const isWatched = (videoId: string) => {
-    return progress.find(p => p.video_id === videoId)?.watched || false
-  }
+    return progress.find((p) => p.video_id === videoId)?.watched || false;
+  };
 
   if (status === 'loading' || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -151,7 +161,7 @@ export default function PlaylistPage() {
           </Link>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -166,7 +176,9 @@ export default function PlaylistPage() {
               >
                 ← Back to Playlists
               </Link>
-              <h1 className="text-xl font-semibold text-gray-900">Playlist Videos</h1>
+              <h1 className="text-xl font-semibold text-gray-900">
+                Playlist Videos
+              </h1>
             </div>
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
@@ -179,9 +191,9 @@ export default function PlaylistPage() {
                     height={32}
                   />
                 )}
-                 <span className="text-sm font-medium text-gray-700">
-                   {session?.user?.name}
-                 </span>
+                <span className="text-sm font-medium text-gray-700">
+                  {session?.user?.name}
+                </span>
               </div>
             </div>
           </div>
@@ -193,7 +205,7 @@ export default function PlaylistPage() {
           {items.length > 0 ? (
             <div className="space-y-4">
               {items.map((item) => {
-                const watched = isWatched(item.contentDetails.videoId)
+                const watched = isWatched(item.contentDetails.videoId);
                 return (
                   <div
                     key={item.id}
@@ -211,7 +223,7 @@ export default function PlaylistPage() {
                         />
                       </div>
                     </div>
-                    
+
                     <div className="flex-1 min-w-0">
                       <h3 className="text-lg font-medium text-gray-900 truncate">
                         {item.snippet.title}
@@ -220,31 +232,55 @@ export default function PlaylistPage() {
                         {item.snippet.channelTitle}
                       </p>
                       <p className="text-sm text-gray-500">
-                        {new Date(item.snippet.publishedAt).toLocaleDateString()}
+                        {new Date(
+                          item.snippet.publishedAt
+                        ).toLocaleDateString()}
                       </p>
                     </div>
 
                     <div className="flex items-center space-x-2">
                       <button
-                        onClick={() => toggleWatched(item.contentDetails.videoId, watched)}
+                        onClick={() =>
+                          toggleWatched(item.contentDetails.videoId, watched)
+                        }
                         className={`p-2 rounded-full ${
                           watched
                             ? 'bg-green-100 text-green-600 hover:bg-green-200'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
-                        title={watched ? 'Mark as unwatched' : 'Mark as watched'}
+                        title={
+                          watched ? 'Mark as unwatched' : 'Mark as watched'
+                        }
                       >
                         {watched ? (
-                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          <svg
+                            className="w-5 h-5"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
                           </svg>
                         ) : (
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M5 13l4 4L19 7"
+                            />
                           </svg>
                         )}
                       </button>
-                      
+
                       <Link
                         href={`/watch/${item.contentDetails.videoId}?playlistId=${playlistId}`}
                         className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -253,17 +289,21 @@ export default function PlaylistPage() {
                       </Link>
                     </div>
                   </div>
-                )
+                );
               })}
             </div>
           ) : (
             <div className="text-center py-12">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No videos found</h3>
-              <p className="text-gray-600">This playlist appears to be empty.</p>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                No videos found
+              </h3>
+              <p className="text-gray-600">
+                This playlist appears to be empty.
+              </p>
             </div>
           )}
         </div>
       </main>
     </div>
-  )
+  );
 }
