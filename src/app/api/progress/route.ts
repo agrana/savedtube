@@ -98,6 +98,12 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('POST /api/progress: Supabase error:', error);
+      console.error('POST /api/progress: Error details:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
       return NextResponse.json(
         { error: 'Failed to save progress' },
         { status: 500 }

@@ -88,6 +88,12 @@ export default function PlaylistPage() {
 
   const toggleWatched = async (videoId: string, currentlyWatched: boolean) => {
     try {
+      console.log('toggleWatched called:', {
+        videoId,
+        currentlyWatched,
+        playlistId,
+      });
+      console.log('Making fetch request to /api/progress...');
       const response = await fetch('/api/progress', {
         method: 'POST',
         headers: {
@@ -110,11 +116,17 @@ export default function PlaylistPage() {
         throw new Error('Failed to update progress');
       }
 
+      const responseData = await response.json();
+      console.log('toggleWatched response data:', responseData);
+
       // Update local state
       setProgress((prev) => {
+        console.log('Previous progress state:', prev);
         const existing = prev.find((p) => p.video_id === videoId);
+        console.log('Existing progress for video:', existing);
+
         if (existing) {
-          return prev.map((p) =>
+          const updated = prev.map((p) =>
             p.video_id === videoId
               ? {
                   ...p,
@@ -125,8 +137,10 @@ export default function PlaylistPage() {
                 }
               : p
           );
+          console.log('Updated progress state:', updated);
+          return updated;
         } else {
-          return [
+          const newProgress = [
             ...prev,
             {
               video_id: videoId,
@@ -134,6 +148,8 @@ export default function PlaylistPage() {
               watched_at: !currentlyWatched ? new Date().toISOString() : null,
             },
           ];
+          console.log('New progress state:', newProgress);
+          return newProgress;
         }
       });
     } catch (error) {
@@ -216,9 +232,10 @@ export default function PlaylistPage() {
                   return null;
                 }
 
-                const watched = progress.some(
-                  (p) => p.video_id === item.contentDetails.videoId
-                );
+                const watched =
+                  progress.find(
+                    (p) => p.video_id === item.contentDetails.videoId
+                  )?.watched || false;
 
                 return (
                   <div
