@@ -96,6 +96,32 @@ export type Database = {
           updated_at?: string;
         };
       };
+      hidden_playlists: {
+        Row: {
+          id: string;
+          user_id: string;
+          playlist_id: string;
+          hidden_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          playlist_id: string;
+          hidden_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          playlist_id?: string;
+          hidden_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
   };
 };
