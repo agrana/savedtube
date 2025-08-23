@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,7 +21,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get progress for the playlist
+    // Create server-side Supabase client with service role key
+    const supabase = createServerSupabaseClient();
+
+    // Get progress for the playlist with RLS policies
     const { data, error } = await supabase
       .from('playlist_progress')
       .select('*')
@@ -64,7 +67,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Upsert progress record
+    // Create server-side Supabase client with service role key
+    const supabase = createServerSupabaseClient();
+
+    // Upsert progress record with RLS policies
     const { data, error } = await supabase
       .from('playlist_progress')
       .upsert(
