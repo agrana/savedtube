@@ -1,13 +1,16 @@
 'use client';
 
 import { signIn } from 'next-auth/react';
+import Logo from '@/components/Logo';
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-8">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 space-y-6">
         <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold text-gray-900">SavedTube</h1>
+          <div className="flex justify-center mb-4">
+            <Logo size="xl" />
+          </div>
           <p className="text-gray-600 text-lg">
             Distraction-free player for your saved YouTube playlists
           </p>
