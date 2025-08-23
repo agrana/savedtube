@@ -158,10 +158,6 @@ export default function PlaylistPage() {
     }
   };
 
-  const isWatched = (videoId: string) => {
-    return progress.find((p) => p.video_id === videoId)?.watched || false;
-  };
-
   if (status === 'loading' || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
