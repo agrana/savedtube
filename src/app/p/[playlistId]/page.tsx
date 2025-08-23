@@ -98,9 +98,15 @@ export default function PlaylistPage() {
           videoId,
           watched: !currentlyWatched,
         }),
+      }).catch((fetchError) => {
+        console.error('Fetch error:', fetchError);
+        throw fetchError;
       });
 
+      console.log('toggleWatched response status:', response.status);
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('toggleWatched error response:', errorText);
         throw new Error('Failed to update progress');
       }
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,7 +21,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get progress for the playlist
+    // Create server-side Supabase client with service role key
+    const supabase = createServerSupabaseClient();
+
+    // Get progress for the playlist with RLS policies
     const { data, error } = await supabase
       .from('playlist_progress')
       .select('*')
@@ -51,20 +54,32 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
+      console.log('POST /api/progress: No session or user ID');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
     const { playlistId, videoId, watched } = body;
 
+    console.log('POST /api/progress:', {
+      userId: session.user.id,
+      playlistId,
+      videoId,
+      watched,
+    });
+
     if (!playlistId || !videoId || typeof watched !== 'boolean') {
+      console.log('POST /api/progress: Missing required fields');
       return NextResponse.json(
         { error: 'playlistId, videoId, and watched are required' },
         { status: 400 }
       );
     }
 
-    // Upsert progress record
+    // Create server-side Supabase client with service role key
+    const supabase = createServerSupabaseClient();
+
+    // Upsert progress record with RLS policies
     const { data, error } = await supabase
       .from('playlist_progress')
       .upsert(
@@ -82,16 +97,17 @@ export async function POST(request: NextRequest) {
       .select();
 
     if (error) {
-      console.error('Supabase error:', error);
+      console.error('POST /api/progress: Supabase error:', error);
       return NextResponse.json(
         { error: 'Failed to save progress' },
         { status: 500 }
       );
     }
 
+    console.log('POST /api/progress: Success, data:', data);
     return NextResponse.json({ progress: data[0] });
   } catch (error) {
-    console.error('Error saving progress:', error);
+    console.error('POST /api/progress: Error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
