@@ -81,4 +81,20 @@ export const securityConfig = {
     isProduction: process.env.NODE_ENV === 'production',
     isTest: process.env.NODE_ENV === 'test',
   },
+
+  // Next.js specific security settings
+  nextjs: {
+    // Server Actions security
+    enableServerActions: true,
+    enableCSRFProtection: true,
+    enableServerComponents: true,
+
+    // Data fetching security
+    enableServerSideDataFetching: true,
+    enableAutomaticRevalidation: true,
+
+    // Cache security
+    enableCacheValidation: true,
+    cacheMaxAge: 60 * 5, // 5 minutes
+  },
 } as const;
