@@ -13,7 +13,9 @@
     "format:check": "prettier --check .",
     "test": "echo \"No tests specified yet\" && exit 0",
     "prepare": "husky",
-    "pre-commit": "lint-staged"
+    "pre-commit": "lint-staged",
+    "pre-commit-full": "./scripts/pre-commit-check.sh",
+    "check-all": "npm run lint && npm run type-check && npm run build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.55.0",
