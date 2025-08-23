@@ -1,6 +1,6 @@
-'use client'
+'use client';
 
-import { signIn } from 'next-auth/react'
+import { signIn } from 'next-auth/react';
 
 export default function Home() {
   return (
@@ -12,7 +12,7 @@ export default function Home() {
             Distraction-free player for your saved YouTube playlists
           </p>
         </div>
-        
+
         <div className="space-y-4">
           <button
             onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
@@ -38,12 +38,32 @@ export default function Home() {
             </svg>
             Sign in with Google
           </button>
-          
+
           <p className="text-xs text-gray-500 text-center">
-            We&apos;ll access your YouTube playlists to provide a distraction-free viewing experience
+            We&apos;ll access your YouTube playlists to provide a
+            distraction-free viewing experience
           </p>
+
+          <div className="pt-4 border-t border-gray-200">
+            <p className="text-xs text-gray-400 text-center mb-2">
+              By signing in, you agree to our{' '}
+              <a
+                href="/terms"
+                className="text-blue-600 hover:text-blue-800 underline"
+              >
+                Terms of Service
+              </a>{' '}
+              and{' '}
+              <a
+                href="/privacy"
+                className="text-blue-600 hover:text-blue-800 underline"
+              >
+                Privacy Policy
+              </a>
+            </p>
+          </div>
         </div>
       </div>
     </main>
-  )
+  );
 }
