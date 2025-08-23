@@ -54,13 +54,22 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
+      console.log('POST /api/progress: No session or user ID');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
     const { playlistId, videoId, watched } = body;
 
+    console.log('POST /api/progress:', {
+      userId: session.user.id,
+      playlistId,
+      videoId,
+      watched,
+    });
+
     if (!playlistId || !videoId || typeof watched !== 'boolean') {
+      console.log('POST /api/progress: Missing required fields');
       return NextResponse.json(
         { error: 'playlistId, videoId, and watched are required' },
         { status: 400 }
@@ -88,16 +97,17 @@ export async function POST(request: NextRequest) {
       .select();
 
     if (error) {
-      console.error('Supabase error:', error);
+      console.error('POST /api/progress: Supabase error:', error);
       return NextResponse.json(
         { error: 'Failed to save progress' },
         { status: 500 }
       );
     }
 
+    console.log('POST /api/progress: Success, data:', data);
     return NextResponse.json({ progress: data[0] });
   } catch (error) {
-    console.error('Error saving progress:', error);
+    console.error('POST /api/progress: Error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

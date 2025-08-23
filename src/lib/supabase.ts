@@ -16,7 +16,7 @@ export const supabase = createClient(
 
 // Server-side Supabase client (for API routes with RLS)
 export const createServerSupabaseClient = (accessToken?: string) => {
-  return createClient(config.supabase.url, config.supabase.serviceKey, {
+  return createClient(config.supabase.url, config.supabase.serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
