@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Create server-side Supabase client with service role key
     const supabase = createServerSupabaseClient();
 
     // Get all hidden playlists for the user
@@ -56,6 +57,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Create server-side Supabase client with service role key
     const supabase = createServerSupabaseClient();
 
     if (hidden) {
