@@ -181,7 +181,7 @@ export function YouTubePlayer({
           mute: 0,
         },
         events: {
-          onReady: (event) => {
+          onReady: () => {
             setIsPlayerReady(true);
             console.log('YouTube player ready');
           },

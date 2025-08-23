@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
+import Logo from '@/components/Logo';
 
 interface PlaylistItem {
   id: string;
@@ -157,10 +158,6 @@ export default function PlaylistPage() {
     }
   };
 
-  const isWatched = (videoId: string) => {
-    return progress.find((p) => p.video_id === videoId)?.watched || false;
-  };
-
   if (status === 'loading' || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -198,6 +195,7 @@ export default function PlaylistPage() {
               >
                 ← Back to Playlists
               </Link>
+              <Logo size="md" className="mr-3" />
               <h1 className="text-xl font-semibold text-gray-900">
                 Playlist Videos
               </h1>

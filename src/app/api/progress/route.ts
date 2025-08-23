@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { createServerSupabaseClient } from '@/lib/supabase';
+import { validateInput, progressSchema } from '@/lib/validation';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,12 +15,18 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const playlistId = searchParams.get('playlistId');
 
-    if (!playlistId) {
-      return NextResponse.json(
-        { error: 'Playlist ID is required' },
-        { status: 400 }
-      );
+    // Validate input
+    const validation = validateInput(
+      progressSchema.pick({ playlistId: true }),
+      { playlistId }
+    );
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+
+    const validatedPlaylistId = (
+      validation as { success: true; data: { playlistId: string } }
+    ).data.playlistId;
 
     // Create server-side Supabase client with service role key
     const supabase = createServerSupabaseClient();
@@ -29,7 +36,7 @@ export async function GET(request: NextRequest) {
       .from('playlist_progress')
       .select('*')
       .eq('user_id', session.user.id)
-      .eq('playlist_id', playlistId);
+      .eq('playlist_id', validatedPlaylistId);
 
     if (error) {
       console.error('Supabase error:', error);
@@ -59,7 +66,20 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { playlistId, videoId, watched } = body;
+
+    // Validate input
+    const validation = validateInput(progressSchema, body);
+    if (!validation.success) {
+      console.log('POST /api/progress: Validation failed:', validation.error);
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
+    const { playlistId, videoId, watched } = (
+      validation as {
+        success: true;
+        data: { playlistId: string; videoId: string; watched: boolean };
+      }
+    ).data;
 
     console.log('POST /api/progress:', {
       userId: session.user.id,
@@ -67,14 +87,6 @@ export async function POST(request: NextRequest) {
       videoId,
       watched,
     });
-
-    if (!playlistId || !videoId || typeof watched !== 'boolean') {
-      console.log('POST /api/progress: Missing required fields');
-      return NextResponse.json(
-        { error: 'playlistId, videoId, and watched are required' },
-        { status: 400 }
-      );
-    }
 
     // Create server-side Supabase client with service role key
     const supabase = createServerSupabaseClient();
