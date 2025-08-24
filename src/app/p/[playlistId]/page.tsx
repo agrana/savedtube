@@ -195,7 +195,7 @@ export default function PlaylistPage() {
               >
                 ← Back to Playlists
               </Link>
-              <Logo size="md" className="mr-3" />
+              <Logo size="md" variant="dark" className="mr-3" />
               <h1 className="text-xl font-semibold text-gray-900">
                 Playlist Videos
               </h1>

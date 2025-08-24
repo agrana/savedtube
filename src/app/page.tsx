@@ -9,7 +9,7 @@ export default function Home() {
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 space-y-6">
         <div className="text-center space-y-4">
           <div className="flex justify-center mb-4">
-            <Logo size="xl" />
+            <Logo size="xl" variant="dark" />
           </div>
           <p className="text-gray-600 text-lg">
             Distraction-free player for your saved YouTube playlists
