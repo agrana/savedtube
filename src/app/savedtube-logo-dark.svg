@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">SavedTube Logo — Dark Theme</title>
+  <desc id="desc">White rounded rectangle with a right-pointing play triangle in near-black, optimized for use on dark backgrounds.</desc>
+  <!-- Logomark -->
+  <rect x="28" y="60" width="200" height="136" rx="40" ry="40" fill="#FFFFFF"/>
+  <!-- Play triangle -->
+  <polygon points="114,94 114,162 170,128" fill="#0A0A0A"/>
+</svg>

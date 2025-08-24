@@ -1,13 +1,17 @@
+import Image from 'next/image';
+
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   showText?: boolean;
   className?: string;
+  variant?: 'default' | 'light' | 'dark' | 'white';
 }
 
 export default function Logo({
   size = 'md',
   showText = true,
   className = '',
+  variant = 'default',
 }: LogoProps) {
   const sizeClasses = {
     sm: 'w-6 h-6',
@@ -20,40 +24,79 @@ export default function Logo({
     sm: 'text-sm',
     md: 'text-lg',
     lg: 'text-xl',
-    xl: 'text-2xl',
+    xl: 'text-3xl',
   };
+
+  // Determine which logo to use based on variant
+  const getLogoSource = () => {
+    switch (variant) {
+      case 'light':
+        return '/savedtube-logo-light.svg';
+      case 'dark':
+        return '/savedtube-logo-dark.svg';
+      case 'white':
+        return '/savedtube-logo-dark.svg'; // Use dark logo for white variant
+      default:
+        // For default, we'll use CSS to switch based on theme
+        return '/savedtube-logo-light.svg';
+    }
+  };
+
+  // Theme-aware color classes for text
+  const getTextColor = () => {
+    switch (variant) {
+      case 'light':
+        return 'text-gray-800';
+      case 'dark':
+        return 'text-gray-900';
+      case 'white':
+        return 'text-white';
+      default:
+        return 'text-gray-900 dark:text-gray-100';
+    }
+  };
+
+  const logoSource = getLogoSource();
+  const textColor = getTextColor();
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      {/* Bookmark with Play Button Icon */}
-      <div className={`${sizeClasses[size]} flex-shrink-0`}>
-        <svg
-          viewBox="0 0 32 32"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className="w-full h-full"
-        >
-          {/* Bookmark shape */}
-          <path
-            d="M6 2C6 0.895431 6.89543 0 8 0H24C25.1046 0 26 0.895431 26 2V30C26 30.5523 25.5523 31 25 31C24.4477 31 24 30.5523 24 30V2H8V30C8 30.5523 7.55228 31 7 31C6.44772 31 6 30.5523 6 30V2Z"
-            fill="currentColor"
-            className="text-gray-700"
+      {/* Logo Icon */}
+      <div className={`${sizeClasses[size]} flex-shrink-0 relative`}>
+        {variant === 'default' ? (
+          // For default variant, show both logos and use CSS to switch
+          <div className="relative">
+            <Image
+              src="/savedtube-logo-light.svg"
+              alt="SavedTube Logo"
+              width={256}
+              height={256}
+              className={`w-full h-full dark:hidden`}
+            />
+            <Image
+              src="/savedtube-logo-dark.svg"
+              alt="SavedTube Logo"
+              width={256}
+              height={256}
+              className={`w-full h-full hidden dark:block`}
+            />
+          </div>
+        ) : (
+          // For specific variants, use the appropriate logo
+          <Image
+            src={logoSource}
+            alt="SavedTube Logo"
+            width={256}
+            height={256}
+            className="w-full h-full"
           />
-
-          {/* Play button triangle */}
-          <path
-            d="M13 8L21 16L13 24V8Z"
-            fill="currentColor"
-            className="text-red-600"
-          />
-        </svg>
+        )}
       </div>
 
       {/* Text Logo */}
       {showText && (
-        <div className={`font-bold text-gray-700 ${textSizes[size]}`}>
-          <div>Saved</div>
-          <div>Tube</div>
+        <div className={`font-bold ${textColor} ${textSizes[size]}`}>
+          <span>SavedTube</span>
         </div>
       )}
     </div>
