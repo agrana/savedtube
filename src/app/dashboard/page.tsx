@@ -179,10 +179,10 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Logo size="md" variant="dark" className="mr-3" />
-              <h1 className="text-xl font-semibold text-gray-900">
-                SavedTube Dashboard
-              </h1>
+              <Logo size="lg" variant="default" showText={true} />
+              <span className="text-lg font-medium text-gray-600 ml-4">
+                Dashboard
+              </span>
             </div>
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">

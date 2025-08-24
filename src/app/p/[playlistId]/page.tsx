@@ -195,10 +195,10 @@ export default function PlaylistPage() {
               >
                 ← Back to Playlists
               </Link>
-              <Logo size="md" variant="dark" className="mr-3" />
-              <h1 className="text-xl font-semibold text-gray-900">
-                Playlist Videos
-              </h1>
+              <Logo size="lg" variant="default" showText={true} />
+              <span className="text-lg font-medium text-gray-600 ml-4">
+                Playlist
+              </span>
             </div>
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
