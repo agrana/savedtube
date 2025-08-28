@@ -26,7 +26,7 @@ export default function Footer() {
               Terms of Service
             </a>
             <a
-              href="mailto:support@savedtube.zenara.be"
+              href="mailto:support@savedtube.com"
               className="text-gray-300 hover:text-white transition-colors text-sm"
             >
               Support
