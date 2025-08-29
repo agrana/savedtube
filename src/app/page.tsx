@@ -47,8 +47,7 @@ export default function Home() {
             </h1>
             <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
               Transform your YouTube playlists into distraction-free learning
-              sessions. No ads, no recommendations, just pure focus on what
-              matters.
+              sessions. No recommendations, just pure focus on what matters.
             </p>
           </div>
 
@@ -136,8 +135,7 @@ export default function Home() {
               Distraction-Free
             </h3>
             <p className="text-gray-600">
-              No ads, no recommendations, no sidebars. Just your content and
-              your focus.
+              No recommendations, no sidebars. Just your content and your focus.
             </p>
           </div>
 
