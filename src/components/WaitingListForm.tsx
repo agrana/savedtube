@@ -63,8 +63,15 @@ export default function WaitingListForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter your email address"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-500"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-500 bg-white text-gray-900"
               disabled={status === 'loading'}
+              style={{
+                WebkitAppearance: 'none',
+                MozAppearance: 'none',
+                appearance: 'none',
+                WebkitTextFillColor: 'rgb(17, 24, 39)',
+                WebkitBoxShadow: '0 0 0px 1000px white inset',
+              }}
             />
           </div>
         </div>
