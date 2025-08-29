@@ -24,3 +24,24 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Override browser autofill styles */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+input[type="text"]:-webkit-autofill,
+input[type="email"]:-webkit-autofill,
+input[type="search"]:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  -webkit-text-fill-color: rgb(17, 24, 39) !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Ensure input fields have proper styling */
+input[type="text"],
+input[type="email"],
+input[type="search"] {
+  background-color: white !important;
+  color: rgb(17, 24, 39) !important;
+}
