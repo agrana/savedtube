@@ -97,10 +97,10 @@ export default function TermsPage() {
             <p className="mb-8">
               For questions about these Terms, contact{' '}
               <a
-                href="mailto:support@savedtube.zenara.be"
+                href="mailto:support@savedtube.com"
                 className="text-blue-600 hover:text-blue-800 underline"
               >
-                support@savedtube.zenara.be
+                support@savedtube.com
               </a>
               .
             </p>

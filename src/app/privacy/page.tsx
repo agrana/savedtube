@@ -103,10 +103,10 @@ export default function PrivacyPage() {
                 You can request deletion of your SavedTube profile by contacting
                 us at{' '}
                 <a
-                  href="mailto:support@savedtube.zenara.be"
+                  href="mailto:support@savedtube.com"
                   className="text-blue-600 hover:text-blue-800 underline"
                 >
-                  support@savedtube.zenara.be
+                  support@savedtube.com
                 </a>
                 .
               </li>
@@ -119,10 +119,10 @@ export default function PrivacyPage() {
             <p className="mb-8">
               If you have any questions about this Privacy Policy, email us at{' '}
               <a
-                href="mailto:support@savedtube.zenara.be"
+                href="mailto:support@savedtube.com"
                 className="text-blue-600 hover:text-blue-800 underline"
               >
-                support@savedtube.zenara.be
+                support@savedtube.com
               </a>
               .
             </p>
