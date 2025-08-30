@@ -20,7 +20,7 @@ export default function PrivacyPage() {
               })}
             </p>
 
-            <p className="mb-6">
+            <p className="mb-6 text-gray-700">
               SavedTube (&ldquo;we&rdquo;, &ldquo;our&rdquo;, &ldquo;us&rdquo;)
               provides a distraction-free interface to view your own saved
               YouTube playlists.
@@ -30,7 +30,7 @@ export default function PrivacyPage() {
               Information we collect
             </h2>
 
-            <ul className="list-disc pl-6 mb-6 space-y-2">
+            <ul className="list-disc pl-6 mb-6 space-y-2 text-gray-700">
               <li>
                 <strong>Google account information:</strong> your basic profile
                 (name, email, avatar) for sign-in.
@@ -46,7 +46,7 @@ export default function PrivacyPage() {
               How we use this information
             </h2>
 
-            <ul className="list-disc pl-6 mb-6 space-y-2">
+            <ul className="list-disc pl-6 mb-6 space-y-2 text-gray-700">
               <li>To let you log in securely with your Google account.</li>
               <li>
                 To display your playlists/videos inside the SavedTube
@@ -70,7 +70,7 @@ export default function PrivacyPage() {
               Data storage & security
             </h2>
 
-            <ul className="list-disc pl-6 mb-6 space-y-2">
+            <ul className="list-disc pl-6 mb-6 space-y-2 text-gray-700">
               <li>
                 Data is stored in Supabase (Postgres) with row-level security so
                 only you can access your playlists.
@@ -85,7 +85,7 @@ export default function PrivacyPage() {
               Your choices
             </h2>
 
-            <ul className="list-disc pl-6 mb-6 space-y-2">
+            <ul className="list-disc pl-6 mb-6 space-y-2 text-gray-700">
               <li>
                 You can revoke SavedTube&apos;s access at any time in your
                 Google account settings:{' '}
@@ -116,7 +116,7 @@ export default function PrivacyPage() {
               Contact
             </h2>
 
-            <p className="mb-8">
+            <p className="mb-8 text-gray-700">
               If you have any questions about this Privacy Policy, email us at{' '}
               <a
                 href="mailto:support@savedtube.com"

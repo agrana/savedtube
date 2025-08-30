@@ -23,7 +23,7 @@ export default function TermsPage() {
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">
               1. Acceptance of terms
             </h2>
-            <p className="mb-6">
+            <p className="mb-6 text-gray-700">
               By using SavedTube you agree to these Terms of Service. If you do
               not agree, do not use the service.
             </p>
@@ -31,7 +31,7 @@ export default function TermsPage() {
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">
               2. Description of service
             </h2>
-            <p className="mb-6">
+            <p className="mb-6 text-gray-700">
               SavedTube provides a distraction-free player for your existing
               YouTube playlists. You must have a valid Google account to use the
               service.
@@ -40,7 +40,7 @@ export default function TermsPage() {
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">
               3. User responsibilities
             </h2>
-            <ul className="list-disc pl-6 mb-6 space-y-2">
+            <ul className="list-disc pl-6 mb-6 space-y-2 text-gray-700">
               <li>
                 You are responsible for your use of the service and your YouTube
                 account.
@@ -59,7 +59,7 @@ export default function TermsPage() {
               4. Data access
             </h2>
             <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
-              <ul className="list-disc pl-6 space-y-2">
+              <ul className="list-disc pl-6 space-y-2 text-gray-800">
                 <li>
                   SavedTube requires read-only access (youtube.readonly) to your
                   YouTube playlists.
@@ -71,14 +71,14 @@ export default function TermsPage() {
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">
               5. Availability and changes
             </h2>
-            <p className="mb-6">
+            <p className="mb-6 text-gray-700">
               We may modify or discontinue SavedTube at any time without notice.
             </p>
 
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">
               6. Disclaimer of warranties
             </h2>
-            <p className="mb-6">
+            <p className="mb-6 text-gray-700">
               SavedTube is provided &ldquo;as is&rdquo; without warranties of
               any kind.
             </p>
@@ -86,7 +86,7 @@ export default function TermsPage() {
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">
               7. Limitation of liability
             </h2>
-            <p className="mb-6">
+            <p className="mb-6 text-gray-700">
               To the maximum extent permitted by law, SavedTube is not liable
               for any damages resulting from the use of the service.
             </p>
@@ -94,7 +94,7 @@ export default function TermsPage() {
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">
               8. Contact
             </h2>
-            <p className="mb-8">
+            <p className="mb-8 text-gray-700">
               For questions about these Terms, contact{' '}
               <a
                 href="mailto:support@savedtube.com"
