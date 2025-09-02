@@ -58,7 +58,7 @@ export const authOptions = {
           scope:
             'openid email profile https://www.googleapis.com/auth/youtube.readonly',
           access_type: 'offline', // Enable refresh tokens
-          prompt: 'consent', // Force consent screen to ensure refresh token
+          prompt: 'select_account', // Allow account selection without forcing consent
         },
       },
     }),
@@ -80,6 +80,11 @@ export const authOptions = {
         token.expiresAt = account.expires_at;
       }
 
+      // If no refresh token, return the token as is (user needs to re-authenticate)
+      if (!token.refreshToken) {
+        return token;
+      }
+
       // Return previous token if the access token has not expired yet
       if (Date.now() < (token.expiresAt as number)) {
         return token;
@@ -99,6 +104,15 @@ export const authOptions = {
       }
 
       return session;
+    },
+    async signOut({ token }: any) {
+      // Clear the token data on signout
+      if (token) {
+        token.accessToken = undefined;
+        token.refreshToken = undefined;
+        token.expiresAt = undefined;
+      }
+      return true;
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
