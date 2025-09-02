@@ -82,10 +82,8 @@ export function YouTubePlayer({
     () => `youtube-player-${Math.random().toString(36).substr(2, 9)}`
   );
 
-  // State to track playback position and state
-  const [currentTime, setCurrentTime] = useState(0);
+  // State to track video changes
   const [lastVideoId, setLastVideoId] = useState('');
-  const [shouldRestorePosition, setShouldRestorePosition] = useState(false);
 
   useEffect(() => {
     // Load YouTube IFrame API
@@ -103,55 +101,14 @@ export function YouTubePlayer({
     }
   }, []);
 
-  // Handle tab visibility changes
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // Tab is hidden - save current state
-        if (playerRef.current && isPlayerReady) {
-          try {
-            const currentTime = playerRef.current.getCurrentTime();
-            setCurrentTime(currentTime);
-            setShouldRestorePosition(true);
-          } catch (error) {
-            console.log('Error saving player state:', error);
-          }
-        }
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [isPlayerReady]);
-
-  // Restore position when player is ready and we need to restore
-  useEffect(() => {
-    if (
-      isPlayerReady &&
-      shouldRestorePosition &&
-      currentTime > 0 &&
-      playerRef.current
-    ) {
-      setTimeout(() => {
-        try {
-          playerRef.current?.seekTo(currentTime, true);
-          setShouldRestorePosition(false);
-        } catch (error) {
-          console.log('Error restoring player state:', error);
-        }
-      }, 500); // Longer delay to ensure player is fully ready
-    }
-  }, [isPlayerReady, shouldRestorePosition, currentTime]);
+  // Note: Removed tab visibility handling to prevent audio glitches
+  // YouTube player handles tab switching naturally without interference
 
   useEffect(() => {
     if (!isYouTubeAPIReady || !containerRef.current || !videoId) return;
 
     // Reset state when video changes
     if (lastVideoId !== videoId) {
-      setCurrentTime(0);
-      setShouldRestorePosition(false);
       setLastVideoId(videoId);
     }
 
