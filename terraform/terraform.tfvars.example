@@ -1,0 +1,12 @@
+# Copy this file to terraform.tfvars and fill in your values
+
+# Domain configuration
+domain_name = "savedtube.com"  # Your domain name
+app_url     = "savedtube.vercel.app"  # Your Vercel app URL
+
+# Email forwarding configuration
+support_email = "your-support-email@gmail.com"  # Where support emails go
+contact_email = "your-contact-email@gmail.com"  # Where contact emails go
+
+# Cloudflare API token (get from https://dash.cloudflare.com/profile/api-tokens)
+cloudflare_api_token = "your-cloudflare-api-token-here"
