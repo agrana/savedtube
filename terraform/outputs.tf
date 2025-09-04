@@ -10,18 +10,15 @@ output "domain_name" {
 
 output "dns_records" {
   description = "Created DNS records"
-  value = {
-    root = cloudflare_record.root.hostname
-    www  = cloudflare_record.www.hostname
-    api  = cloudflare_record.api.hostname
-  }
+  value       = module.dns.dns_records
+}
+
+output "page_rules" {
+  description = "Created page rules"
+  value       = module.dns.page_rules
 }
 
 output "email_forwarding_rules" {
   description = "Created email forwarding rules"
-  value = {
-    support = "support@${local.domain_name} -> ${var.support_email}"
-    contact = "contact@${local.domain_name} -> ${var.contact_email}"
-    hello   = "hello@${local.domain_name} -> ${var.contact_email}"
-  }
+  value       = module.email_routing.email_forwarding_rules
 }
