@@ -19,7 +19,7 @@ variable "contact_email" {
 }
 
 variable "cloudflare_api_token" {
-  description = "Cloudflare API token"
+  description = "Cloudflare API token with all required permissions (Zone:Zone:Read, Zone:DNS:Edit, Zone:Email Routing:Read, Zone:Email Routing:Edit)"
   type        = string
   sensitive   = true
 }

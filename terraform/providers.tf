@@ -8,8 +8,7 @@ terraform {
   }
 }
 
-# Configure the Cloudflare Provider
+# Single Cloudflare Provider with all permissions
 provider "cloudflare" {
-  # API token will be read from CLOUDFLARE_API_TOKEN environment variable
-  # or from cloudflare.tfvars file
+  api_token = var.cloudflare_api_token
 }

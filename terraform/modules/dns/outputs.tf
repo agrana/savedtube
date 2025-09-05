@@ -7,10 +7,11 @@ output "dns_records" {
   }
 }
 
-output "page_rules" {
-  description = "Created page rules"
-  value = {
-    cache_static_assets = cloudflare_page_rule.cache_static_assets.id
-    security_headers    = cloudflare_page_rule.security_headers.id
-  }
-}
+# Page rules outputs temporarily disabled
+# output "page_rules" {
+#   description = "Created page rules"
+#   value = {
+#     cache_static_assets = cloudflare_page_rule.cache_static_assets.id
+#     security_headers    = cloudflare_page_rule.security_headers.id
+#   }
+# }

@@ -13,10 +13,11 @@ output "dns_records" {
   value       = module.dns.dns_records
 }
 
-output "page_rules" {
-  description = "Created page rules"
-  value       = module.dns.page_rules
-}
+# Page rules outputs temporarily disabled
+# output "page_rules" {
+#   description = "Created page rules"
+#   value       = module.dns.page_rules
+# }
 
 output "email_forwarding_rules" {
   description = "Created email forwarding rules"
