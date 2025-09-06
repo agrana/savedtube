@@ -85,3 +85,15 @@ variable "nextauth_secret" {
   type        = string
   sensitive   = true
 }
+
+# Supabase Configuration
+variable "supabase_access_token" {
+  description = "Supabase access token (get from https://supabase.com/dashboard/account/tokens)"
+  type        = string
+  sensitive   = true
+}
+
+variable "supabase_project_id" {
+  description = "Supabase project ID"
+  type        = string
+}
