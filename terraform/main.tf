@@ -27,3 +27,24 @@ module "email_routing" {
   support_email = var.support_email
   contact_email = var.contact_email
 }
+
+# Vercel Module
+module "vercel" {
+  source = "./modules/vercel"
+
+  project_name = var.vercel_project_name
+  domain_name  = local.domain_name
+  github_repo  = var.github_repo
+  team_id      = var.vercel_team_id
+}
+
+# Outputs
+output "vercel_project_url" {
+  description = "The URL of the Vercel project"
+  value       = module.vercel.project_url
+}
+
+output "vercel_domain_url" {
+  description = "The custom domain URL"
+  value       = module.vercel.domain_url
+}
