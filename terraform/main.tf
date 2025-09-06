@@ -38,6 +38,13 @@ module "vercel" {
   team_id      = var.vercel_team_id
 }
 
+# Supabase Module
+module "supabase" {
+  source = "./modules/supabase"
+
+  project_id = var.supabase_project_id
+}
+
 # Outputs
 output "vercel_project_url" {
   description = "The URL of the Vercel project"
@@ -47,4 +54,15 @@ output "vercel_project_url" {
 output "vercel_domain_url" {
   description = "The custom domain URL"
   value       = module.vercel.domain_url
+}
+
+# Supabase Outputs
+output "supabase_project_url" {
+  description = "The URL of the Supabase project"
+  value       = module.supabase.project_url
+}
+
+output "supabase_api_url" {
+  description = "The API URL of the Supabase project"
+  value       = module.supabase.api_url
 }
