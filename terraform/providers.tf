@@ -5,10 +5,19 @@ terraform {
       source  = "cloudflare/cloudflare"
       version = "~> 4.0"
     }
+    vercel = {
+      source  = "vercel/vercel"
+      version = "~> 1.0"
+    }
   }
 }
 
 # Single Cloudflare Provider with all permissions
 provider "cloudflare" {
   api_token = var.cloudflare_api_token
+}
+
+# Vercel Provider
+provider "vercel" {
+  api_token = var.vercel_api_token
 }
