@@ -152,3 +152,47 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Interval ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const supabase = createServerSupabaseClient();
+
+    const { error } = await supabase
+      .from('video_intervals')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', session.user.id); // Ensure user owns the interval
+
+    if (error) {
+      console.error('Error deleting interval:', error);
+      return NextResponse.json(
+        { error: 'Failed to delete interval' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error in DELETE /api/vid-intervals:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
