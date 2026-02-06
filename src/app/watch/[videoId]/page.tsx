@@ -132,7 +132,11 @@ export default function WatchPage() {
         body: JSON.stringify({ videoId, overwrite }),
       });
 
-      let data: { importedCount?: number; error?: string } | null = null;
+      let data: {
+        importedCount?: number;
+        error?: string;
+        warning?: string;
+      } | null = null;
       try {
         data = await response.json();
       } catch {
@@ -154,7 +158,10 @@ export default function WatchPage() {
       if (importedCount === 0) {
         setImportMessage('No chapters found in the YouTube description.');
       } else {
-        setImportMessage(`Imported ${importedCount} intervals from YouTube.`);
+        const baseMessage = `Imported ${importedCount} intervals from YouTube.`;
+        setImportMessage(
+          data?.warning ? `${baseMessage} ${data.warning}` : baseMessage
+        );
       }
 
       await fetchIntervals();

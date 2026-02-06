@@ -114,27 +114,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (existingIntervals && existingIntervals.length > 0 && !overwrite) {
+    const existingIds = (existingIntervals || []).map(
+      (interval) => interval.id
+    );
+
+    if (existingIds.length > 0 && !overwrite) {
       return NextResponse.json(
         { error: 'Intervals already exist for this video' },
         { status: 409 }
       );
-    }
-
-    if (overwrite) {
-      const { error: deleteError } = await supabase
-        .from('video_intervals')
-        .delete()
-        .eq('user_id', session.user.id)
-        .eq('video_id', videoId);
-
-      if (deleteError) {
-        console.error('Error deleting existing intervals:', deleteError);
-        return NextResponse.json(
-          { error: 'Failed to replace existing intervals' },
-          { status: 500 }
-        );
-      }
     }
 
     const ytUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
@@ -209,9 +197,25 @@ export async function POST(request: NextRequest) {
       updatedAt: item.updated_at,
     }));
 
+    let warning: string | undefined;
+
+    if (overwrite && existingIds.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('video_intervals')
+        .delete()
+        .in('id', existingIds);
+
+      if (deleteError) {
+        console.error('Error deleting existing intervals:', deleteError);
+        warning =
+          'Imported new intervals, but failed to remove existing intervals.';
+      }
+    }
+
     return NextResponse.json({
       importedCount: mapped.length,
       intervals: mapped,
+      warning,
     });
   } catch (error) {
     console.error('Error in POST /api/vid-intervals/import:', error);
