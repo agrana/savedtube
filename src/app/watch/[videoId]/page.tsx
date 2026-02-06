@@ -4,7 +4,9 @@ import { useSession } from 'next-auth/react';
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { YouTubePlayer } from '../../../components/YouTubePlayer';
+import { YouTubePlayer, TimeInterval } from '../../../components/YouTubePlayer';
+import { IntervalManager } from '../../../components/IntervalManager';
+import { VideoInterval } from '../../../types/intervals';
 
 interface PlaylistItem {
   id: string;
@@ -38,6 +40,15 @@ export default function WatchPage() {
   const [error, setError] = useState<string | null>(null);
   const [autoplayEnabled, setAutoplayEnabled] = useState(true);
 
+  // Interval management state
+  const [intervals, setIntervals] = useState<VideoInterval[]>([]);
+  const [loopEnabled, setLoopEnabled] = useState(false);
+  const [showIntervalPanel, setShowIntervalPanel] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [videoDuration, setVideoDuration] = useState<number | undefined>(
+    undefined
+  );
+
   const fetchPlaylistItems = useCallback(async () => {
     try {
       const response = await fetch(
@@ -57,6 +68,55 @@ export default function WatchPage() {
     }
   }, [playlistId]);
 
+  const fetchIntervals = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/vid-intervals?videoId=${videoId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch intervals');
+      }
+      const data = await response.json();
+      setIntervals(data.intervals || []);
+    } catch (error) {
+      console.error('Error fetching intervals:', error);
+    }
+  }, [videoId]);
+
+  const handleAddInterval = async (startTime: number, endTime: number) => {
+    try {
+      const response = await fetch('/api/vid-intervals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoId, startTime, endTime }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create interval');
+      }
+
+      await fetchIntervals();
+    } catch (error) {
+      console.error('Error adding interval:', error);
+      throw error;
+    }
+  };
+
+  const handleDeleteInterval = async (intervalId: string) => {
+    try {
+      const response = await fetch(`/api/vid-intervals?id=${intervalId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete interval');
+      }
+
+      await fetchIntervals();
+    } catch (error) {
+      console.error('Error deleting interval:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     if (status === 'loading') return;
 
@@ -68,7 +128,10 @@ export default function WatchPage() {
     if (playlistId) {
       fetchPlaylistItems();
     }
-  }, [session, status, playlistId, fetchPlaylistItems, router]);
+
+    // Fetch intervals for this video
+    fetchIntervals();
+  }, [session, status, playlistId, fetchPlaylistItems, fetchIntervals, router]);
 
   useEffect(() => {
     const storedAutoplay =
@@ -247,9 +310,19 @@ export default function WatchPage() {
             autoPlay={autoplayEnabled}
             onEnd={() => {
               if (hasNext && autoplayEnabled) {
+            intervals={intervals.map(
+              (interval): TimeInterval => ({
+                startTime: interval.startTime,
+                endTime: interval.endTime,
+              })
+            )}
+            loopEnabled={loopEnabled}
+            onEnd={() => {
+              if (hasNext && intervals.length === 0) {
                 goToNext();
               }
             }}
+            onCurrentTimeUpdate={setCurrentTime}
           />
         </div>
       </div>
@@ -312,6 +385,41 @@ export default function WatchPage() {
           </button>
         </div>
       </div>
+
+      {/* Interval Toggle Button */}
+      <button
+        onClick={() => setShowIntervalPanel(!showIntervalPanel)}
+        className="fixed top-20 right-4 z-30 p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg transition-colors"
+        title="Manage time intervals"
+      >
+        <svg
+          className="w-6 h-6"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+      </button>
+
+      {/* Interval Manager Panel */}
+      <IntervalManager
+        videoId={videoId}
+        intervals={intervals}
+        loopEnabled={loopEnabled}
+        videoDuration={videoDuration}
+        currentTime={currentTime}
+        onAddInterval={handleAddInterval}
+        onDeleteInterval={handleDeleteInterval}
+        onToggleLoop={setLoopEnabled}
+        isOpen={showIntervalPanel}
+        onClose={() => setShowIntervalPanel(false)}
+      />
     </div>
   );
 }

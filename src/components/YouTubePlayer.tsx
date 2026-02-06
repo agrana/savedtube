@@ -38,6 +38,7 @@ interface YouTubePlayerInstance {
   getPlayerState: () => number;
   playVideo: () => void;
   pauseVideo: () => void;
+  getDuration: () => number;
 }
 
 declare global {
@@ -59,22 +60,35 @@ declare global {
   }
 }
 
+export interface TimeInterval {
+  startTime: number;
+  endTime: number;
+}
+
 interface YouTubePlayerProps {
   videoId: string;
+  intervals?: TimeInterval[];
+  loopEnabled?: boolean;
   onEnd?: () => void;
   onPlay?: () => void;
   onPause?: () => void;
   onError?: (error: YouTubePlayerEvent) => void;
   autoPlay?: boolean;
+  onIntervalChange?: (intervalIndex: number) => void;
+  onCurrentTimeUpdate?: (currentTime: number) => void;
 }
 
 export function YouTubePlayer({
   videoId,
+  intervals = [],
+  loopEnabled = false,
   onEnd,
   onPlay,
   onPause,
   onError,
   autoPlay = false,
+  onIntervalChange,
+  onCurrentTimeUpdate,
 }: YouTubePlayerProps) {
   const playerRef = useRef<YouTubePlayerInstance | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -86,6 +100,10 @@ export function YouTubePlayer({
 
   // State to track video changes
   const [lastVideoId, setLastVideoId] = useState('');
+
+  // Interval playback state
+  const [currentIntervalIndex, setCurrentIntervalIndex] = useState(0);
+  const intervalCheckRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Load YouTube IFrame API
@@ -173,6 +191,109 @@ export function YouTubePlayer({
     onError,
     lastVideoId,
     autoPlay,
+  ]);
+
+  // Interval playback monitoring
+  useEffect(() => {
+    if (!isPlayerReady || !playerRef.current || intervals.length === 0) {
+      // Clear monitoring if no intervals
+      if (intervalCheckRef.current) {
+        clearInterval(intervalCheckRef.current);
+        intervalCheckRef.current = null;
+      }
+      return;
+    }
+
+    // Sort intervals by start time
+    const sortedIntervals = [...intervals].sort(
+      (a, b) => a.startTime - b.startTime
+    );
+
+    // Set up monitoring interval
+    intervalCheckRef.current = setInterval(() => {
+      if (!playerRef.current) return;
+
+      try {
+        const currentTime = playerRef.current.getCurrentTime();
+        const playerState = playerRef.current.getPlayerState();
+
+        // Only monitor when playing
+        if (playerState !== window.YT.PlayerState.PLAYING) return;
+
+        // Update current time for parent component
+        onCurrentTimeUpdate?.(currentTime);
+
+        // Find which interval we should be in
+        let targetIntervalIndex = -1;
+        let shouldSeek = false;
+        let seekTarget = 0;
+
+        for (let i = 0; i < sortedIntervals.length; i++) {
+          const interval = sortedIntervals[i];
+
+          if (
+            currentTime >= interval.startTime &&
+            currentTime < interval.endTime
+          ) {
+            // We're in a valid interval
+            targetIntervalIndex = i;
+            break;
+          } else if (currentTime < interval.startTime) {
+            // We're before this interval, seek to its start
+            targetIntervalIndex = i;
+            shouldSeek = true;
+            seekTarget = interval.startTime;
+            break;
+          }
+        }
+
+        // If we're past all intervals
+        if (
+          targetIntervalIndex === -1 &&
+          currentTime >= sortedIntervals[sortedIntervals.length - 1].endTime
+        ) {
+          if (loopEnabled) {
+            // Loop back to first interval
+            playerRef.current.seekTo(sortedIntervals[0].startTime, true);
+            setCurrentIntervalIndex(0);
+            onIntervalChange?.(0);
+          } else {
+            // Pause at the end
+            playerRef.current.pauseVideo();
+          }
+          return;
+        }
+
+        // If we're between intervals or before the first one
+        if (shouldSeek && targetIntervalIndex !== -1) {
+          playerRef.current.seekTo(seekTarget, true);
+          setCurrentIntervalIndex(targetIntervalIndex);
+          onIntervalChange?.(targetIntervalIndex);
+        } else if (
+          targetIntervalIndex !== -1 &&
+          targetIntervalIndex !== currentIntervalIndex
+        ) {
+          setCurrentIntervalIndex(targetIntervalIndex);
+          onIntervalChange?.(targetIntervalIndex);
+        }
+      } catch (error) {
+        console.error('Error in interval monitoring:', error);
+      }
+    }, 200); // Check every 200ms
+
+    return () => {
+      if (intervalCheckRef.current) {
+        clearInterval(intervalCheckRef.current);
+        intervalCheckRef.current = null;
+      }
+    };
+  }, [
+    isPlayerReady,
+    intervals,
+    loopEnabled,
+    currentIntervalIndex,
+    onIntervalChange,
+    onCurrentTimeUpdate,
   ]);
 
   return (
