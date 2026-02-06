@@ -16,6 +16,8 @@ interface IntervalManagerProps {
   isImporting?: boolean;
   importError?: string | null;
   importMessage?: string | null;
+  activeIntervalId?: string | null;
+  onSelectInterval?: (interval: VideoInterval) => void;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -33,6 +35,8 @@ export function IntervalManager({
   isImporting = false,
   importError,
   importMessage,
+  activeIntervalId,
+  onSelectInterval,
   isOpen,
   onClose,
 }: IntervalManagerProps) {
@@ -255,7 +259,21 @@ export function IntervalManager({
                     .map((interval, index) => (
                       <div
                         key={interval.id}
-                        className="flex items-center justify-between p-3 bg-gray-800 rounded-lg hover:bg-gray-750 transition-colors"
+                        onClick={() => onSelectInterval?.(interval)}
+                        onKeyDown={(event) => {
+                          if (!onSelectInterval) return;
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            onSelectInterval(interval);
+                          }
+                        }}
+                        className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                          interval.id === activeIntervalId
+                            ? 'bg-blue-700'
+                            : 'bg-gray-800 hover:bg-gray-750'
+                        } ${onSelectInterval ? 'cursor-pointer' : ''}`}
+                        role={onSelectInterval ? 'button' : undefined}
+                        tabIndex={onSelectInterval ? 0 : undefined}
                       >
                         <div className="flex items-center space-x-3">
                           <span className="text-sm text-gray-400">
@@ -275,7 +293,10 @@ export function IntervalManager({
                           </div>
                         </div>
                         <button
-                          onClick={() => handleDelete(interval.id)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDelete(interval.id);
+                          }}
                           className="p-2 hover:bg-red-600 hover:bg-opacity-20 rounded transition-colors"
                           aria-label="Delete interval"
                         >

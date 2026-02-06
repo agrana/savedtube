@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { YouTubePlayer, TimeInterval } from '../../../components/YouTubePlayer';
@@ -48,6 +48,11 @@ export default function WatchPage() {
   const [videoDuration, setVideoDuration] = useState<number | undefined>(
     undefined
   );
+  const [activeIntervalId, setActiveIntervalId] = useState<string | null>(null);
+  const [seekRequest, setSeekRequest] = useState<{
+    time: number;
+    token: number;
+  } | null>(null);
   const [isImportingIntervals, setIsImportingIntervals] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
@@ -178,6 +183,11 @@ export default function WatchPage() {
       setIsImportingIntervals(false);
     }
   };
+
+  const sortedIntervals = useMemo(
+    () => [...intervals].sort((a, b) => a.startTime - b.startTime),
+    [intervals]
+  );
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -370,7 +380,7 @@ export default function WatchPage() {
           <YouTubePlayer
             videoId={videoId}
             autoPlay={autoplayEnabled}
-            intervals={intervals.map(
+            intervals={sortedIntervals.map(
               (interval): TimeInterval => ({
                 startTime: interval.startTime,
                 endTime: interval.endTime,
@@ -382,7 +392,14 @@ export default function WatchPage() {
                 goToNext();
               }
             }}
+            onIntervalChange={(index) => {
+              const interval = sortedIntervals[index];
+              setActiveIntervalId(interval?.id ?? null);
+            }}
             onCurrentTimeUpdate={setCurrentTime}
+            seekToSeconds={seekRequest?.time ?? null}
+            seekToToken={seekRequest?.token}
+            onSeekComplete={() => setSeekRequest(null)}
           />
         </div>
       </div>
@@ -481,6 +498,10 @@ export default function WatchPage() {
         isImporting={isImportingIntervals}
         importError={importError}
         importMessage={importMessage}
+        activeIntervalId={activeIntervalId}
+        onSelectInterval={(interval) =>
+          setSeekRequest({ time: interval.startTime, token: Date.now() })
+        }
         isOpen={showIntervalPanel}
         onClose={() => setShowIntervalPanel(false)}
       />
