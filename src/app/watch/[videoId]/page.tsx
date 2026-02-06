@@ -148,6 +148,12 @@ export default function WatchPage() {
           setImportError('Intervals already exist for this video.');
           return;
         }
+        if (response.status === 401) {
+          setImportError(
+            'Your YouTube session expired. Please sign out and sign back in.'
+          );
+          return;
+        }
         setImportError(
           data?.error || 'Failed to import intervals from YouTube.'
         );
