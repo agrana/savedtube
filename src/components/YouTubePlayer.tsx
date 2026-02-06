@@ -73,6 +73,7 @@ interface YouTubePlayerProps {
   onPlay?: () => void;
   onPause?: () => void;
   onError?: (error: YouTubePlayerEvent) => void;
+  autoPlay?: boolean;
   onIntervalChange?: (intervalIndex: number) => void;
   onCurrentTimeUpdate?: (currentTime: number) => void;
 }
@@ -85,6 +86,7 @@ export function YouTubePlayer({
   onPlay,
   onPause,
   onError,
+  autoPlay = false,
   onIntervalChange,
   onCurrentTimeUpdate,
 }: YouTubePlayerProps) {
@@ -152,13 +154,16 @@ export function YouTubePlayer({
           origin: typeof window !== 'undefined' ? window.location.origin : '',
           showinfo: 0,
           fs: 1,
-          autoplay: 0,
+          autoplay: autoPlay ? 1 : 0,
           mute: 0,
         },
         events: {
           onReady: () => {
             setIsPlayerReady(true);
             console.log('YouTube player ready');
+            if (autoPlay) {
+              playerRef.current?.playVideo();
+            }
           },
           onStateChange: (event) => {
             if (event.data === window.YT.PlayerState.ENDED) {
@@ -185,6 +190,7 @@ export function YouTubePlayer({
     onPause,
     onError,
     lastVideoId,
+    autoPlay,
   ]);
 
   // Interval playback monitoring

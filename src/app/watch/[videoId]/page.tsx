@@ -38,6 +38,7 @@ export default function WatchPage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [autoplayEnabled, setAutoplayEnabled] = useState(true);
 
   // Interval management state
   const [intervals, setIntervals] = useState<VideoInterval[]>([]);
@@ -131,6 +132,21 @@ export default function WatchPage() {
     // Fetch intervals for this video
     fetchIntervals();
   }, [session, status, playlistId, fetchPlaylistItems, fetchIntervals, router]);
+
+  useEffect(() => {
+    const storedAutoplay =
+      typeof window !== 'undefined'
+        ? window.localStorage.getItem('savedtube:autoplay')
+        : null;
+    if (storedAutoplay !== null) {
+      setAutoplayEnabled(storedAutoplay === 'true');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('savedtube:autoplay', String(autoplayEnabled));
+  }, [autoplayEnabled]);
 
   useEffect(() => {
     if (playlistItems.length > 0) {
@@ -256,6 +272,27 @@ export default function WatchPage() {
             <span className="text-white text-sm">
               {currentIndex + 1} of {playlistItems.length}
             </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={autoplayEnabled}
+              onClick={() => setAutoplayEnabled((prev) => !prev)}
+              className="flex items-center space-x-2 text-white text-xs sm:text-sm hover:text-gray-200 transition-colors"
+              title="Toggle autoplay"
+            >
+              <span className="hidden sm:inline">Autoplay</span>
+              <span
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                  autoplayEnabled ? 'bg-white' : 'bg-gray-600'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-black transition-transform ${
+                    autoplayEnabled ? 'translate-x-4' : 'translate-x-1'
+                  }`}
+                />
+              </span>
+            </button>
             <div className="text-white text-xs opacity-70">
               <span className="hidden sm:inline">
                 ← → to navigate, Esc to exit
@@ -270,6 +307,7 @@ export default function WatchPage() {
         <div className="w-full max-w-6xl">
           <YouTubePlayer
             videoId={videoId}
+            autoPlay={autoplayEnabled}
             intervals={intervals.map(
               (interval): TimeInterval => ({
                 startTime: interval.startTime,
@@ -278,7 +316,7 @@ export default function WatchPage() {
             )}
             loopEnabled={loopEnabled}
             onEnd={() => {
-              if (hasNext && intervals.length === 0) {
+              if (hasNext && autoplayEnabled && intervals.length === 0) {
                 goToNext();
               }
             }}
