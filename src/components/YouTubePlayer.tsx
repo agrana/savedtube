@@ -65,6 +65,7 @@ interface YouTubePlayerProps {
   onPlay?: () => void;
   onPause?: () => void;
   onError?: (error: YouTubePlayerEvent) => void;
+  autoPlay?: boolean;
 }
 
 export function YouTubePlayer({
@@ -73,6 +74,7 @@ export function YouTubePlayer({
   onPlay,
   onPause,
   onError,
+  autoPlay = false,
 }: YouTubePlayerProps) {
   const playerRef = useRef<YouTubePlayerInstance | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -134,13 +136,16 @@ export function YouTubePlayer({
           origin: typeof window !== 'undefined' ? window.location.origin : '',
           showinfo: 0,
           fs: 1,
-          autoplay: 0,
+          autoplay: autoPlay ? 1 : 0,
           mute: 0,
         },
         events: {
           onReady: () => {
             setIsPlayerReady(true);
             console.log('YouTube player ready');
+            if (autoPlay) {
+              playerRef.current?.playVideo();
+            }
           },
           onStateChange: (event) => {
             if (event.data === window.YT.PlayerState.ENDED) {
@@ -167,6 +172,7 @@ export function YouTubePlayer({
     onPause,
     onError,
     lastVideoId,
+    autoPlay,
   ]);
 
   return (
