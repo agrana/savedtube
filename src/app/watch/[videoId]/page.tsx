@@ -308,8 +308,6 @@ export default function WatchPage() {
           <YouTubePlayer
             videoId={videoId}
             autoPlay={autoplayEnabled}
-            onEnd={() => {
-              if (hasNext && autoplayEnabled) {
             intervals={intervals.map(
               (interval): TimeInterval => ({
                 startTime: interval.startTime,
@@ -318,7 +316,7 @@ export default function WatchPage() {
             )}
             loopEnabled={loopEnabled}
             onEnd={() => {
-              if (hasNext && intervals.length === 0) {
+              if (hasNext && autoplayEnabled && intervals.length === 0) {
                 goToNext();
               }
             }}
