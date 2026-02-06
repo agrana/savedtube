@@ -12,6 +12,12 @@ interface IntervalManagerProps {
   onAddInterval: (startTime: number, endTime: number) => Promise<void>;
   onDeleteInterval: (intervalId: string) => Promise<void>;
   onToggleLoop: (enabled: boolean) => void;
+  onImportFromYouTube?: (overwrite: boolean) => Promise<void>;
+  isImporting?: boolean;
+  importError?: string | null;
+  importMessage?: string | null;
+  activeIntervalId?: string | null;
+  onSelectInterval?: (interval: VideoInterval) => void;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -25,6 +31,12 @@ export function IntervalManager({
   onAddInterval,
   onDeleteInterval,
   onToggleLoop,
+  onImportFromYouTube,
+  isImporting = false,
+  importError,
+  importMessage,
+  activeIntervalId,
+  onSelectInterval,
   isOpen,
   onClose,
 }: IntervalManagerProps) {
@@ -108,6 +120,21 @@ export function IntervalManager({
     }
   };
 
+  const handleImport = async () => {
+    if (!onImportFromYouTube) return;
+
+    let overwrite = false;
+    if (intervals.length > 0) {
+      const confirmed = window.confirm(
+        'Replace existing intervals with YouTube chapters? This will delete your current intervals.'
+      );
+      if (!confirmed) return;
+      overwrite = true;
+    }
+
+    await onImportFromYouTube(overwrite);
+  };
+
   const totalWatchTime = intervals.reduce(
     (sum, interval) => sum + (interval.endTime - interval.startTime),
     0
@@ -178,6 +205,37 @@ export function IntervalManager({
               </button>
             </div>
 
+            {/* Import from YouTube */}
+            {onImportFromYouTube && (
+              <div className="p-4 bg-gray-800 rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium">Import from YouTube</h3>
+                    <p className="text-sm text-gray-400">
+                      Use chapter timestamps from the video description
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleImport}
+                    disabled={isImporting}
+                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded text-sm font-medium transition-colors"
+                  >
+                    {isImporting ? 'Importing...' : 'Import'}
+                  </button>
+                </div>
+                {importError && (
+                  <div className="p-3 bg-red-900 bg-opacity-30 border border-red-500 rounded text-sm text-red-200">
+                    {importError}
+                  </div>
+                )}
+                {importMessage && (
+                  <div className="p-3 bg-green-900 bg-opacity-30 border border-green-500 rounded text-sm text-green-200">
+                    {importMessage}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Intervals List */}
             <div>
               <div className="flex items-center justify-between mb-3">
@@ -201,7 +259,21 @@ export function IntervalManager({
                     .map((interval, index) => (
                       <div
                         key={interval.id}
-                        className="flex items-center justify-between p-3 bg-gray-800 rounded-lg hover:bg-gray-750 transition-colors"
+                        onClick={() => onSelectInterval?.(interval)}
+                        onKeyDown={(event) => {
+                          if (!onSelectInterval) return;
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            onSelectInterval(interval);
+                          }
+                        }}
+                        className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                          interval.id === activeIntervalId
+                            ? 'bg-blue-700'
+                            : 'bg-gray-800 hover:bg-gray-750'
+                        } ${onSelectInterval ? 'cursor-pointer' : ''}`}
+                        role={onSelectInterval ? 'button' : undefined}
+                        tabIndex={onSelectInterval ? 0 : undefined}
                       >
                         <div className="flex items-center space-x-3">
                           <span className="text-sm text-gray-400">
@@ -221,7 +293,10 @@ export function IntervalManager({
                           </div>
                         </div>
                         <button
-                          onClick={() => handleDelete(interval.id)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDelete(interval.id);
+                          }}
                           className="p-2 hover:bg-red-600 hover:bg-opacity-20 rounded transition-colors"
                           aria-label="Delete interval"
                         >

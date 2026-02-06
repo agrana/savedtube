@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { YouTubePlayer, TimeInterval } from '../../../components/YouTubePlayer';
@@ -38,6 +38,7 @@ export default function WatchPage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [autoplayEnabled, setAutoplayEnabled] = useState(true);
 
   // Interval management state
   const [intervals, setIntervals] = useState<VideoInterval[]>([]);
@@ -47,6 +48,14 @@ export default function WatchPage() {
   const [videoDuration, setVideoDuration] = useState<number | undefined>(
     undefined
   );
+  const [activeIntervalId, setActiveIntervalId] = useState<string | null>(null);
+  const [seekRequest, setSeekRequest] = useState<{
+    time: number;
+    token: number;
+  } | null>(null);
+  const [isImportingIntervals, setIsImportingIntervals] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
 
   const fetchPlaylistItems = useCallback(async () => {
     try {
@@ -116,6 +125,70 @@ export default function WatchPage() {
     }
   };
 
+  const handleImportFromYouTube = async (overwrite: boolean) => {
+    setIsImportingIntervals(true);
+    setImportError(null);
+    setImportMessage(null);
+
+    try {
+      const response = await fetch('/api/vid-intervals/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoId, overwrite }),
+      });
+
+      let data: {
+        importedCount?: number;
+        error?: string;
+        warning?: string;
+      } | null = null;
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
+      }
+
+      if (!response.ok) {
+        if (response.status === 409) {
+          setImportError('Intervals already exist for this video.');
+          return;
+        }
+        if (response.status === 401) {
+          setImportError(
+            'Your YouTube session expired. Please sign out and sign back in.'
+          );
+          return;
+        }
+        setImportError(
+          data?.error || 'Failed to import intervals from YouTube.'
+        );
+        return;
+      }
+
+      const importedCount = data?.importedCount ?? 0;
+      if (importedCount === 0) {
+        setImportMessage('No chapters found in the YouTube description.');
+      } else {
+        const baseMessage = `Imported ${importedCount} intervals from YouTube.`;
+        setImportMessage(
+          data?.warning ? `${baseMessage} ${data.warning}` : baseMessage
+        );
+      }
+
+      await fetchIntervals();
+    } catch (error) {
+      console.error('Error importing intervals:', error);
+      setImportError('Failed to import intervals from YouTube.');
+    } finally {
+      setIsImportingIntervals(false);
+    }
+  };
+
+  const sortedIntervals = useMemo(
+    () => [...intervals].sort((a, b) => a.startTime - b.startTime),
+    [intervals]
+  );
+
   useEffect(() => {
     if (status === 'loading') return;
 
@@ -131,6 +204,21 @@ export default function WatchPage() {
     // Fetch intervals for this video
     fetchIntervals();
   }, [session, status, playlistId, fetchPlaylistItems, fetchIntervals, router]);
+
+  useEffect(() => {
+    const storedAutoplay =
+      typeof window !== 'undefined'
+        ? window.localStorage.getItem('savedtube:autoplay')
+        : null;
+    if (storedAutoplay !== null) {
+      setAutoplayEnabled(storedAutoplay === 'true');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('savedtube:autoplay', String(autoplayEnabled));
+  }, [autoplayEnabled]);
 
   useEffect(() => {
     if (playlistItems.length > 0) {
@@ -256,6 +344,27 @@ export default function WatchPage() {
             <span className="text-white text-sm">
               {currentIndex + 1} of {playlistItems.length}
             </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={autoplayEnabled}
+              onClick={() => setAutoplayEnabled((prev) => !prev)}
+              className="flex items-center space-x-2 text-white text-xs sm:text-sm hover:text-gray-200 transition-colors"
+              title="Toggle autoplay"
+            >
+              <span className="hidden sm:inline">Autoplay</span>
+              <span
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                  autoplayEnabled ? 'bg-white' : 'bg-gray-600'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-black transition-transform ${
+                    autoplayEnabled ? 'translate-x-4' : 'translate-x-1'
+                  }`}
+                />
+              </span>
+            </button>
             <div className="text-white text-xs opacity-70">
               <span className="hidden sm:inline">
                 ← → to navigate, Esc to exit
@@ -270,7 +379,8 @@ export default function WatchPage() {
         <div className="w-full max-w-6xl">
           <YouTubePlayer
             videoId={videoId}
-            intervals={intervals.map(
+            autoPlay={autoplayEnabled}
+            intervals={sortedIntervals.map(
               (interval): TimeInterval => ({
                 startTime: interval.startTime,
                 endTime: interval.endTime,
@@ -278,11 +388,18 @@ export default function WatchPage() {
             )}
             loopEnabled={loopEnabled}
             onEnd={() => {
-              if (hasNext && intervals.length === 0) {
+              if (hasNext && autoplayEnabled && intervals.length === 0) {
                 goToNext();
               }
             }}
+            onIntervalChange={(index) => {
+              const interval = sortedIntervals[index];
+              setActiveIntervalId(interval?.id ?? null);
+            }}
             onCurrentTimeUpdate={setCurrentTime}
+            seekToSeconds={seekRequest?.time ?? null}
+            seekToToken={seekRequest?.token}
+            onSeekComplete={() => setSeekRequest(null)}
           />
         </div>
       </div>
@@ -377,6 +494,14 @@ export default function WatchPage() {
         onAddInterval={handleAddInterval}
         onDeleteInterval={handleDeleteInterval}
         onToggleLoop={setLoopEnabled}
+        onImportFromYouTube={handleImportFromYouTube}
+        isImporting={isImportingIntervals}
+        importError={importError}
+        importMessage={importMessage}
+        activeIntervalId={activeIntervalId}
+        onSelectInterval={(interval) =>
+          setSeekRequest({ time: interval.startTime, token: Date.now() })
+        }
         isOpen={showIntervalPanel}
         onClose={() => setShowIntervalPanel(false)}
       />

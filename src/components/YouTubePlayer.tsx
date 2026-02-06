@@ -73,8 +73,12 @@ interface YouTubePlayerProps {
   onPlay?: () => void;
   onPause?: () => void;
   onError?: (error: YouTubePlayerEvent) => void;
+  autoPlay?: boolean;
   onIntervalChange?: (intervalIndex: number) => void;
   onCurrentTimeUpdate?: (currentTime: number) => void;
+  seekToSeconds?: number | null;
+  seekToToken?: number;
+  onSeekComplete?: () => void;
 }
 
 export function YouTubePlayer({
@@ -85,8 +89,12 @@ export function YouTubePlayer({
   onPlay,
   onPause,
   onError,
+  autoPlay = false,
   onIntervalChange,
   onCurrentTimeUpdate,
+  seekToSeconds = null,
+  seekToToken,
+  onSeekComplete,
 }: YouTubePlayerProps) {
   const playerRef = useRef<YouTubePlayerInstance | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -152,13 +160,16 @@ export function YouTubePlayer({
           origin: typeof window !== 'undefined' ? window.location.origin : '',
           showinfo: 0,
           fs: 1,
-          autoplay: 0,
+          autoplay: autoPlay ? 1 : 0,
           mute: 0,
         },
         events: {
           onReady: () => {
             setIsPlayerReady(true);
             console.log('YouTube player ready');
+            if (autoPlay) {
+              playerRef.current?.playVideo();
+            }
           },
           onStateChange: (event) => {
             if (event.data === window.YT.PlayerState.ENDED) {
@@ -185,7 +196,17 @@ export function YouTubePlayer({
     onPause,
     onError,
     lastVideoId,
+    autoPlay,
   ]);
+
+  useEffect(() => {
+    if (!isPlayerReady || !playerRef.current) return;
+    if (seekToSeconds === null || typeof seekToSeconds === 'undefined') return;
+
+    playerRef.current.seekTo(seekToSeconds, true);
+    playerRef.current.playVideo();
+    onSeekComplete?.();
+  }, [isPlayerReady, seekToSeconds, seekToToken, onSeekComplete]);
 
   // Interval playback monitoring
   useEffect(() => {
