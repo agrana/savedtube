@@ -58,7 +58,8 @@ export const authOptions = {
           scope:
             'openid email profile https://www.googleapis.com/auth/youtube.readonly',
           access_type: 'offline', // Enable refresh tokens
-          prompt: 'select_account', // Allow account selection without forcing consent
+          prompt: 'consent select_account', // Ensure refresh token issuance
+          include_granted_scopes: 'true',
         },
       },
     }),
@@ -77,16 +78,25 @@ export const authOptions = {
       if (account) {
         token.accessToken = account.access_token;
         token.refreshToken = account.refresh_token;
-        token.expiresAt = account.expires_at;
+        if (account.expires_at) {
+          token.expiresAt = account.expires_at * 1000; // Convert seconds to ms
+        } else if (account.expires_in) {
+          token.expiresAt = Date.now() + account.expires_in * 1000;
+        } else {
+          token.expiresAt = undefined;
+        }
       }
 
-      // If no refresh token, return the token as is (user needs to re-authenticate)
+      // If no refresh token, return the token as is (user may need to re-authenticate)
       if (!token.refreshToken) {
+        if (token.expiresAt && Date.now() >= (token.expiresAt as number)) {
+          return { ...token, error: 'NoRefreshToken' };
+        }
         return token;
       }
 
       // Return previous token if the access token has not expired yet
-      if (Date.now() < (token.expiresAt as number)) {
+      if (token.expiresAt && Date.now() < (token.expiresAt as number)) {
         return token;
       }
 

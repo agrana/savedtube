@@ -76,6 +76,9 @@ interface YouTubePlayerProps {
   autoPlay?: boolean;
   onIntervalChange?: (intervalIndex: number) => void;
   onCurrentTimeUpdate?: (currentTime: number) => void;
+  seekToSeconds?: number | null;
+  seekToToken?: number;
+  onSeekComplete?: () => void;
 }
 
 export function YouTubePlayer({
@@ -89,6 +92,9 @@ export function YouTubePlayer({
   autoPlay = false,
   onIntervalChange,
   onCurrentTimeUpdate,
+  seekToSeconds = null,
+  seekToToken,
+  onSeekComplete,
 }: YouTubePlayerProps) {
   const playerRef = useRef<YouTubePlayerInstance | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -192,6 +198,15 @@ export function YouTubePlayer({
     lastVideoId,
     autoPlay,
   ]);
+
+  useEffect(() => {
+    if (!isPlayerReady || !playerRef.current) return;
+    if (seekToSeconds === null || typeof seekToSeconds === 'undefined') return;
+
+    playerRef.current.seekTo(seekToSeconds, true);
+    playerRef.current.playVideo();
+    onSeekComplete?.();
+  }, [isPlayerReady, seekToSeconds, seekToToken, onSeekComplete]);
 
   // Interval playback monitoring
   useEffect(() => {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { YouTubePlayer, TimeInterval } from '../../../components/YouTubePlayer';
@@ -48,6 +48,11 @@ export default function WatchPage() {
   const [videoDuration, setVideoDuration] = useState<number | undefined>(
     undefined
   );
+  const [activeIntervalId, setActiveIntervalId] = useState<string | null>(null);
+  const [seekRequest, setSeekRequest] = useState<{
+    time: number;
+    token: number;
+  } | null>(null);
   const [isImportingIntervals, setIsImportingIntervals] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
@@ -132,7 +137,11 @@ export default function WatchPage() {
         body: JSON.stringify({ videoId, overwrite }),
       });
 
-      let data: { importedCount?: number; error?: string } | null = null;
+      let data: {
+        importedCount?: number;
+        error?: string;
+        warning?: string;
+      } | null = null;
       try {
         data = await response.json();
       } catch {
@@ -142,6 +151,12 @@ export default function WatchPage() {
       if (!response.ok) {
         if (response.status === 409) {
           setImportError('Intervals already exist for this video.');
+          return;
+        }
+        if (response.status === 401) {
+          setImportError(
+            'Your YouTube session expired. Please sign out and sign back in.'
+          );
           return;
         }
         setImportError(
@@ -154,7 +169,10 @@ export default function WatchPage() {
       if (importedCount === 0) {
         setImportMessage('No chapters found in the YouTube description.');
       } else {
-        setImportMessage(`Imported ${importedCount} intervals from YouTube.`);
+        const baseMessage = `Imported ${importedCount} intervals from YouTube.`;
+        setImportMessage(
+          data?.warning ? `${baseMessage} ${data.warning}` : baseMessage
+        );
       }
 
       await fetchIntervals();
@@ -165,6 +183,11 @@ export default function WatchPage() {
       setIsImportingIntervals(false);
     }
   };
+
+  const sortedIntervals = useMemo(
+    () => [...intervals].sort((a, b) => a.startTime - b.startTime),
+    [intervals]
+  );
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -357,7 +380,7 @@ export default function WatchPage() {
           <YouTubePlayer
             videoId={videoId}
             autoPlay={autoplayEnabled}
-            intervals={intervals.map(
+            intervals={sortedIntervals.map(
               (interval): TimeInterval => ({
                 startTime: interval.startTime,
                 endTime: interval.endTime,
@@ -369,7 +392,14 @@ export default function WatchPage() {
                 goToNext();
               }
             }}
+            onIntervalChange={(index) => {
+              const interval = sortedIntervals[index];
+              setActiveIntervalId(interval?.id ?? null);
+            }}
             onCurrentTimeUpdate={setCurrentTime}
+            seekToSeconds={seekRequest?.time ?? null}
+            seekToToken={seekRequest?.token}
+            onSeekComplete={() => setSeekRequest(null)}
           />
         </div>
       </div>
@@ -468,6 +498,10 @@ export default function WatchPage() {
         isImporting={isImportingIntervals}
         importError={importError}
         importMessage={importMessage}
+        activeIntervalId={activeIntervalId}
+        onSelectInterval={(interval) =>
+          setSeekRequest({ time: interval.startTime, token: Date.now() })
+        }
         isOpen={showIntervalPanel}
         onClose={() => setShowIntervalPanel(false)}
       />
