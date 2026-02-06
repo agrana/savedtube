@@ -48,6 +48,9 @@ export default function WatchPage() {
   const [videoDuration, setVideoDuration] = useState<number | undefined>(
     undefined
   );
+  const [isImportingIntervals, setIsImportingIntervals] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
 
   const fetchPlaylistItems = useCallback(async () => {
     try {
@@ -114,6 +117,52 @@ export default function WatchPage() {
     } catch (error) {
       console.error('Error deleting interval:', error);
       throw error;
+    }
+  };
+
+  const handleImportFromYouTube = async (overwrite: boolean) => {
+    setIsImportingIntervals(true);
+    setImportError(null);
+    setImportMessage(null);
+
+    try {
+      const response = await fetch('/api/vid-intervals/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoId, overwrite }),
+      });
+
+      let data: { importedCount?: number; error?: string } | null = null;
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
+      }
+
+      if (!response.ok) {
+        if (response.status === 409) {
+          setImportError('Intervals already exist for this video.');
+          return;
+        }
+        setImportError(
+          data?.error || 'Failed to import intervals from YouTube.'
+        );
+        return;
+      }
+
+      const importedCount = data?.importedCount ?? 0;
+      if (importedCount === 0) {
+        setImportMessage('No chapters found in the YouTube description.');
+      } else {
+        setImportMessage(`Imported ${importedCount} intervals from YouTube.`);
+      }
+
+      await fetchIntervals();
+    } catch (error) {
+      console.error('Error importing intervals:', error);
+      setImportError('Failed to import intervals from YouTube.');
+    } finally {
+      setIsImportingIntervals(false);
     }
   };
 
@@ -415,6 +464,10 @@ export default function WatchPage() {
         onAddInterval={handleAddInterval}
         onDeleteInterval={handleDeleteInterval}
         onToggleLoop={setLoopEnabled}
+        onImportFromYouTube={handleImportFromYouTube}
+        isImporting={isImportingIntervals}
+        importError={importError}
+        importMessage={importMessage}
         isOpen={showIntervalPanel}
         onClose={() => setShowIntervalPanel(false)}
       />
