@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, type FormEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -31,6 +31,13 @@ interface Progress {
   watched_at: string | null;
 }
 
+type SortMode =
+  | 'custom'
+  | 'date_desc'
+  | 'date_asc'
+  | 'alpha_asc'
+  | 'alpha_desc';
+
 export default function PlaylistPage() {
   const { data: session, status } = useSession();
   const params = useParams();
@@ -41,25 +48,33 @@ export default function PlaylistPage() {
   const [progress, setProgress] = useState<Progress[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<SortMode>('custom');
+  const [videoUrl, setVideoUrl] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editMessage, setEditMessage] = useState<string | null>(null);
+  const [isApplyingEdit, setIsApplyingEdit] = useState(false);
 
   const fetchPlaylistItems = useCallback(async () => {
     try {
+      setError(null);
+      setEditError(null);
       const response = await fetch(
-        `/api/playlist-items?playlistId=${playlistId}`
+        `/api/playlist-items?playlistId=${encodeURIComponent(playlistId)}&sort=${sortMode}`
       );
+
       if (!response.ok) {
         throw new Error('Failed to fetch playlist items');
       }
 
       const data = await response.json();
       setItems(data.items || []);
-    } catch (error) {
-      console.error('Error fetching playlist items:', error);
+    } catch (fetchError) {
+      console.error('Error fetching playlist items:', fetchError);
       setError('Failed to load playlist');
     } finally {
       setIsLoading(false);
     }
-  }, [playlistId]);
+  }, [playlistId, sortMode]);
 
   const fetchProgress = useCallback(async () => {
     try {
@@ -70,8 +85,8 @@ export default function PlaylistPage() {
 
       const data = await response.json();
       setProgress(data.progress || []);
-    } catch (error) {
-      console.error('Error fetching progress:', error);
+    } catch (fetchError) {
+      console.error('Error fetching progress:', fetchError);
     }
   }, [playlistId]);
 
@@ -85,16 +100,10 @@ export default function PlaylistPage() {
 
     fetchPlaylistItems();
     fetchProgress();
-  }, [session, status, playlistId, fetchPlaylistItems, fetchProgress, router]);
+  }, [session, status, fetchPlaylistItems, fetchProgress, router]);
 
   const toggleWatched = async (videoId: string, currentlyWatched: boolean) => {
     try {
-      console.log('toggleWatched called:', {
-        videoId,
-        currentlyWatched,
-        playlistId,
-      });
-      console.log('Making fetch request to /api/progress...');
       const response = await fetch('/api/progress', {
         method: 'POST',
         headers: {
@@ -105,29 +114,17 @@ export default function PlaylistPage() {
           videoId,
           watched: !currentlyWatched,
         }),
-      }).catch((fetchError) => {
-        console.error('Fetch error:', fetchError);
-        throw fetchError;
       });
 
-      console.log('toggleWatched response status:', response.status);
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('toggleWatched error response:', errorText);
         throw new Error('Failed to update progress');
       }
 
-      const responseData = await response.json();
-      console.log('toggleWatched response data:', responseData);
-
-      // Update local state
       setProgress((prev) => {
-        console.log('Previous progress state:', prev);
         const existing = prev.find((p) => p.video_id === videoId);
-        console.log('Existing progress for video:', existing);
 
         if (existing) {
-          const updated = prev.map((p) =>
+          return prev.map((p) =>
             p.video_id === videoId
               ? {
                   ...p,
@@ -138,23 +135,150 @@ export default function PlaylistPage() {
                 }
               : p
           );
-          console.log('Updated progress state:', updated);
-          return updated;
-        } else {
-          const newProgress = [
-            ...prev,
-            {
-              video_id: videoId,
-              watched: !currentlyWatched,
-              watched_at: !currentlyWatched ? new Date().toISOString() : null,
-            },
-          ];
-          console.log('New progress state:', newProgress);
-          return newProgress;
         }
+
+        return [
+          ...prev,
+          {
+            video_id: videoId,
+            watched: !currentlyWatched,
+            watched_at: !currentlyWatched ? new Date().toISOString() : null,
+          },
+        ];
       });
-    } catch (error) {
-      console.error('Error updating progress:', error);
+    } catch (updateError) {
+      console.error('Error updating progress:', updateError);
+    }
+  };
+
+  const persistCustomOrder = async (orderedVideoIds: string[]) => {
+    const response = await fetch('/api/playlist-items', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'reorder',
+        playlistId,
+        orderedVideoIds,
+      }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || 'Failed to save custom order');
+    }
+  };
+
+  const moveItem = async (index: number, direction: -1 | 1) => {
+    if (sortMode !== 'custom' || isApplyingEdit) return;
+
+    const target = index + direction;
+    if (target < 0 || target >= items.length) return;
+
+    setEditError(null);
+    setEditMessage(null);
+
+    const previousItems = items;
+    const reordered = [...items];
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    setItems(reordered);
+    setIsApplyingEdit(true);
+
+    try {
+      await persistCustomOrder(
+        reordered.map((item) => item.contentDetails.videoId)
+      );
+    } catch (reorderError) {
+      setItems(previousItems);
+      setEditError(
+        reorderError instanceof Error
+          ? reorderError.message
+          : 'Failed to save custom order'
+      );
+    } finally {
+      setIsApplyingEdit(false);
+    }
+  };
+
+  const removeVideo = async (videoId: string) => {
+    if (isApplyingEdit) return;
+
+    setEditError(null);
+    setEditMessage(null);
+    setIsApplyingEdit(true);
+
+    try {
+      const response = await fetch('/api/playlist-items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'remove',
+          playlistId,
+          videoId,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to remove video');
+      }
+
+      setItems((prev) =>
+        prev.filter((item) => item.contentDetails.videoId !== videoId)
+      );
+      setEditMessage('Video removed from this playlist view.');
+    } catch (removeError) {
+      setEditError(
+        removeError instanceof Error
+          ? removeError.message
+          : 'Failed to remove video'
+      );
+    } finally {
+      setIsApplyingEdit(false);
+    }
+  };
+
+  const addVideoByUrl = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!videoUrl.trim() || isApplyingEdit) {
+      return;
+    }
+
+    setEditError(null);
+    setEditMessage(null);
+    setIsApplyingEdit(true);
+
+    try {
+      const response = await fetch('/api/playlist-items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'add',
+          playlistId,
+          url: videoUrl.trim(),
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to add video');
+      }
+
+      setVideoUrl('');
+      setEditMessage('Video added to this playlist view.');
+      await fetchPlaylistItems();
+    } catch (addError) {
+      setEditError(
+        addError instanceof Error ? addError.message : 'Failed to add video'
+      );
+    } finally {
+      setIsApplyingEdit(false);
     }
   };
 
@@ -222,18 +346,70 @@ export default function PlaylistPage() {
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
+          <div className="bg-white rounded-lg shadow-md p-4 mb-6 space-y-4">
+            <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <label
+                  htmlFor="sort-mode"
+                  className="text-sm font-medium text-gray-700"
+                >
+                  Sort
+                </label>
+                <select
+                  id="sort-mode"
+                  value={sortMode}
+                  onChange={(event) => setSortMode(event.target.value as SortMode)}
+                  className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900"
+                >
+                  <option value="custom">Custom order</option>
+                  <option value="date_desc">Date (newest first)</option>
+                  <option value="date_asc">Date (oldest first)</option>
+                  <option value="alpha_asc">Alphabetical (A-Z)</option>
+                  <option value="alpha_desc">Alphabetical (Z-A)</option>
+                </select>
+              </div>
+              <p className="text-xs text-gray-500">
+                Total videos shown: {items.length}
+              </p>
+            </div>
+
+            <form onSubmit={addVideoByUrl} className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="url"
+                value={videoUrl}
+                onChange={(event) => setVideoUrl(event.target.value)}
+                placeholder="Add video by YouTube URL"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"
+                required
+              />
+              <button
+                type="submit"
+                disabled={isApplyingEdit}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                Add video
+              </button>
+            </form>
+
+            {editError && (
+              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                {editError}
+              </div>
+            )}
+
+            {editMessage && (
+              <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+                {editMessage}
+              </div>
+            )}
+          </div>
+
           {items.length > 0 ? (
             <div className="space-y-4">
-              {items.map((item) => {
-                // Skip items that don't have required properties
-                if (!item?.snippet?.title || !item?.contentDetails?.videoId) {
-                  return null;
-                }
-
+              {items.map((item, index) => {
+                const videoId = item.contentDetails.videoId;
                 const watched =
-                  progress.find(
-                    (p) => p.video_id === item.contentDetails.videoId
-                  )?.watched || false;
+                  progress.find((p) => p.video_id === videoId)?.watched || false;
 
                 return (
                   <div
@@ -266,26 +442,41 @@ export default function PlaylistPage() {
                       </p>
                       <p className="text-sm text-gray-500">
                         {item.snippet.publishedAt
-                          ? new Date(
-                              item.snippet.publishedAt
-                            ).toLocaleDateString()
+                          ? new Date(item.snippet.publishedAt).toLocaleDateString()
                           : 'Unknown Date'}
                       </p>
                     </div>
 
                     <div className="flex items-center space-x-2">
+                      {sortMode === 'custom' && (
+                        <>
+                          <button
+                            onClick={() => moveItem(index, -1)}
+                            disabled={index === 0 || isApplyingEdit}
+                            className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40"
+                            title="Move up"
+                          >
+                            ↑
+                          </button>
+                          <button
+                            onClick={() => moveItem(index, 1)}
+                            disabled={index === items.length - 1 || isApplyingEdit}
+                            className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40"
+                            title="Move down"
+                          >
+                            ↓
+                          </button>
+                        </>
+                      )}
+
                       <button
-                        onClick={() =>
-                          toggleWatched(item.contentDetails.videoId, watched)
-                        }
+                        onClick={() => toggleWatched(videoId, watched)}
                         className={`p-2 rounded-full ${
                           watched
                             ? 'bg-green-100 text-green-600 hover:bg-green-200'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
-                        title={
-                          watched ? 'Mark as unwatched' : 'Mark as watched'
-                        }
+                        title={watched ? 'Mark as unwatched' : 'Mark as watched'}
                       >
                         {watched ? (
                           <svg
@@ -316,8 +507,17 @@ export default function PlaylistPage() {
                         )}
                       </button>
 
+                      <button
+                        onClick={() => removeVideo(videoId)}
+                        disabled={isApplyingEdit}
+                        className="px-3 py-2 text-sm rounded-md bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50"
+                        title="Remove from this playlist view"
+                      >
+                        Remove
+                      </button>
+
                       <Link
-                        href={`/watch/${item.contentDetails.videoId}?playlistId=${playlistId}`}
+                        href={`/watch/${videoId}?playlistId=${playlistId}`}
                         className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                       >
                         Watch
@@ -333,7 +533,7 @@ export default function PlaylistPage() {
                 No videos found
               </h3>
               <p className="text-gray-600">
-                This playlist appears to be empty.
+                This playlist appears to be empty or all items were removed.
               </p>
             </div>
           )}

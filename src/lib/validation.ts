@@ -53,6 +53,34 @@ export function validateYouTubeUrl(url: string): boolean {
   return patterns.some((pattern) => pattern.test(url));
 }
 
+export function extractYouTubeVideoId(url: string): string | null {
+  try {
+    const parsed = new URL(url.trim());
+    const host = parsed.hostname.replace(/^www\./, '');
+
+    if (host === 'youtu.be') {
+      const id = parsed.pathname.replace('/', '').trim();
+      return youtubeVideoIdRegex.test(id) ? id : null;
+    }
+
+    if (host === 'youtube.com' || host === 'm.youtube.com') {
+      if (parsed.pathname === '/watch') {
+        const id = parsed.searchParams.get('v') || '';
+        return youtubeVideoIdRegex.test(id) ? id : null;
+      }
+
+      if (parsed.pathname.startsWith('/shorts/')) {
+        const id = parsed.pathname.split('/')[2] || '';
+        return youtubeVideoIdRegex.test(id) ? id : null;
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // Type-safe validation wrapper
 export function validateInput<T>(
   schema: z.ZodSchema<T>,

@@ -122,6 +122,41 @@ export type Database = {
           updated_at?: string;
         };
       };
+      playlist_item_edits: {
+        Row: {
+          id: string;
+          user_id: string;
+          playlist_id: string;
+          video_id: string;
+          custom_order: number | null;
+          removed: boolean;
+          added_by_user: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          playlist_id: string;
+          video_id: string;
+          custom_order?: number | null;
+          removed?: boolean;
+          added_by_user?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          playlist_id?: string;
+          video_id?: string;
+          custom_order?: number | null;
+          removed?: boolean;
+          added_by_user?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
   };
 };
