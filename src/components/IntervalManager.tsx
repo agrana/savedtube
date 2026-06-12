@@ -11,6 +11,7 @@ interface IntervalManagerProps {
   currentTime?: number;
   onAddInterval: (startTime: number, endTime: number) => Promise<void>;
   onDeleteInterval: (intervalId: string) => Promise<void>;
+  onRenameInterval: (intervalId: string, name: string) => Promise<void>;
   onToggleLoop: (enabled: boolean) => void;
   onImportFromYouTube?: (overwrite: boolean) => Promise<void>;
   isImporting?: boolean;
@@ -30,6 +31,7 @@ export function IntervalManager({
   currentTime = 0,
   onAddInterval,
   onDeleteInterval,
+  onRenameInterval,
   onToggleLoop,
   onImportFromYouTube,
   isImporting = false,
@@ -45,6 +47,11 @@ export function IntervalManager({
   const [endMinutes, setEndMinutes] = useState('');
   const [endSeconds, setEndSeconds] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const [renamingIntervalId, setRenamingIntervalId] = useState<string | null>(
+    null
+  );
+  const [renameValue, setRenameValue] = useState('');
+  const [isRenaming, setIsRenaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const formatTime = (seconds: number): string => {
@@ -120,6 +127,34 @@ export function IntervalManager({
     }
   };
 
+  const getIntervalDisplayName = (interval: VideoInterval, index: number) =>
+    interval.name?.trim() || `interval_${index + 1}`;
+
+  const beginRename = (interval: VideoInterval, index: number) => {
+    setRenamingIntervalId(interval.id);
+    setRenameValue(getIntervalDisplayName(interval, index));
+    setError(null);
+  };
+
+  const cancelRename = () => {
+    setRenamingIntervalId(null);
+    setRenameValue('');
+  };
+
+  const saveRename = async (intervalId: string) => {
+    setIsRenaming(true);
+    setError(null);
+    try {
+      await onRenameInterval(intervalId, renameValue);
+      cancelRename();
+    } catch (err) {
+      setError('Failed to rename interval');
+      console.error(err);
+    } finally {
+      setIsRenaming(false);
+    }
+  };
+
   const handleImport = async () => {
     if (!onImportFromYouTube) return;
 
@@ -138,6 +173,10 @@ export function IntervalManager({
   const totalWatchTime = intervals.reduce(
     (sum, interval) => sum + (interval.endTime - interval.startTime),
     0
+  );
+
+  const sortedIntervals = [...intervals].sort(
+    (a, b) => a.startTime - b.startTime
   );
 
   return (
@@ -246,68 +285,129 @@ export function IntervalManager({
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {intervals
-                    .sort((a, b) => a.orderIndex - b.orderIndex)
-                    .map((interval, index) => (
-                      <div
-                        key={interval.id}
-                        onClick={() => onSelectInterval?.(interval)}
-                        onKeyDown={(event) => {
-                          if (!onSelectInterval) return;
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault();
-                            onSelectInterval(interval);
-                          }
-                        }}
-                        className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
-                          interval.id === activeIntervalId
-                            ? 'bg-blue-700'
-                            : 'bg-gray-800 hover:bg-gray-750'
-                        } ${onSelectInterval ? 'cursor-pointer' : ''}`}
-                        role={onSelectInterval ? 'button' : undefined}
-                        tabIndex={onSelectInterval ? 0 : undefined}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <span className="text-sm text-gray-400">
-                            #{index + 1}
-                          </span>
-                          <div>
-                            <div className="font-mono text-sm">
-                              {formatTime(interval.startTime)} →{' '}
-                              {formatTime(interval.endTime)}
+                  {sortedIntervals.map((interval, index) => (
+                    <div
+                      key={interval.id}
+                      onClick={() => onSelectInterval?.(interval)}
+                      onKeyDown={(event) => {
+                        if (!onSelectInterval) return;
+                        if (renamingIntervalId === interval.id) return;
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          onSelectInterval(interval);
+                        }
+                      }}
+                      className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                        interval.id === activeIntervalId
+                          ? 'bg-blue-700'
+                          : 'bg-gray-800 hover:bg-gray-750'
+                      } ${onSelectInterval ? 'cursor-pointer' : ''}`}
+                      role={onSelectInterval ? 'button' : undefined}
+                      tabIndex={onSelectInterval ? 0 : undefined}
+                    >
+                      <div className="flex min-w-0 flex-1 items-center space-x-3">
+                        <span className="text-sm text-gray-400">
+                          #{index + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          {renamingIntervalId === interval.id ? (
+                            <div
+                              className="mb-2 flex items-center gap-2"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              <input
+                                type="text"
+                                value={renameValue}
+                                onChange={(event) =>
+                                  setRenameValue(event.target.value)
+                                }
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter') {
+                                    event.preventDefault();
+                                    saveRename(interval.id);
+                                  }
+                                  if (event.key === 'Escape') {
+                                    event.preventDefault();
+                                    cancelRename();
+                                  }
+                                }}
+                                maxLength={100}
+                                className="min-w-0 flex-1 rounded border border-gray-600 bg-gray-900 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
+                                aria-label="Interval name"
+                                autoFocus
+                              />
+                              <button
+                                type="button"
+                                onClick={() => saveRename(interval.id)}
+                                disabled={isRenaming}
+                                className="rounded bg-blue-600 px-2 py-1 text-xs font-medium hover:bg-blue-700 disabled:bg-gray-600"
+                              >
+                                Save
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelRename}
+                                disabled={isRenaming}
+                                className="rounded bg-gray-700 px-2 py-1 text-xs font-medium hover:bg-gray-600 disabled:bg-gray-600"
+                              >
+                                Cancel
+                              </button>
                             </div>
-                            <div className="text-xs text-gray-400">
-                              Duration:{' '}
-                              {formatTime(
-                                interval.endTime - interval.startTime
-                              )}
+                          ) : (
+                            <div className="mb-1 flex items-center gap-2">
+                              <div className="truncate text-sm font-medium">
+                                {getIntervalDisplayName(interval, index)}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  beginRename(interval, index);
+                                }}
+                                className="rounded px-2 py-0.5 text-xs text-blue-300 hover:bg-blue-600 hover:bg-opacity-20"
+                                aria-label={`Rename ${getIntervalDisplayName(
+                                  interval,
+                                  index
+                                )}`}
+                              >
+                                Rename
+                              </button>
                             </div>
+                          )}
+                          <div className="font-mono text-sm">
+                            {formatTime(interval.startTime)} →{' '}
+                            {formatTime(interval.endTime)}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            Duration:{' '}
+                            {formatTime(interval.endTime - interval.startTime)}
                           </div>
                         </div>
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleDelete(interval.id);
-                          }}
-                          className="p-2 hover:bg-red-600 hover:bg-opacity-20 rounded transition-colors"
-                          aria-label="Delete interval"
-                        >
-                          <svg
-                            className="w-5 h-5 text-red-400"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                            />
-                          </svg>
-                        </button>
                       </div>
-                    ))}
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleDelete(interval.id);
+                        }}
+                        className="p-2 hover:bg-red-600 hover:bg-opacity-20 rounded transition-colors"
+                        aria-label="Delete interval"
+                      >
+                        <svg
+                          className="w-5 h-5 text-red-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
