@@ -5,9 +5,33 @@ import Logo from '@/components/Logo';
 
 const DASHBOARD_CALLBACK_URL = '/dashboard';
 
+const featureCards = [
+  {
+    eyebrow: '01',
+    title: 'Import a playlist',
+    body: 'Bring in the YouTube lessons, sets, talks, and sessions you already saved. Your library becomes a quiet practice room.',
+  },
+  {
+    eyebrow: '02',
+    title: 'Mark the useful part',
+    body: 'Set precise start and end points while the video keeps playing. Create up to five free practice loops.',
+  },
+  {
+    eyebrow: '03',
+    title: 'Repeat deliberately',
+    body: 'Return to the exact passage tomorrow, slow down, replay, and build a focused practice habit.',
+  },
+];
+
+const loopRows = [
+  { title: 'Intro groove', time: '00:42 — 01:18', state: 'Active' },
+  { title: 'Bridge transition', time: '03:04 — 03:37', state: 'Saved' },
+  { title: 'Difficult ending', time: '06:11 — 06:44', state: 'Next' },
+];
+
 function GoogleIcon() {
   return (
-    <svg className="w-6 h-6" viewBox="0 0 24 24" aria-hidden="true">
+    <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
       <path
         fill="currentColor"
         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -32,274 +56,192 @@ function GoogleSignInButton() {
   return (
     <button
       onClick={() => signIn('google', { callbackUrl: DASHBOARD_CALLBACK_URL })}
-      className="inline-flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-lg font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl"
+      className="group inline-flex items-center justify-center gap-3 rounded-full border border-white/10 bg-stone-100 px-6 py-3 text-sm font-medium text-stone-950 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_16px_60px_rgba(0,0,0,0.45)] transition duration-200 hover:bg-white hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_20px_80px_rgba(245,158,11,0.12)]"
     >
       <GoogleIcon />
-      Sign in with Google
+      Start practicing
+      <span className="text-stone-500 transition group-hover:translate-x-0.5">
+        →
+      </span>
     </button>
   );
 }
 
-function SignInCTA() {
+function UpgradeButton() {
   return (
-    <div className="space-y-4">
-      <GoogleSignInButton />
-      <p className="text-sm text-gray-500">
-        Start practicing with your YouTube playlists.
-      </p>
-    </div>
+    <a
+      href="#upgrade"
+      className="inline-flex items-center justify-center rounded-full border border-amber-300/20 bg-amber-300/10 px-4 py-2 text-sm font-medium text-amber-100 transition hover:border-amber-200/40 hover:bg-amber-300/15"
+    >
+      Upgrade
+    </a>
   );
 }
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-      {/* Navigation */}
-      <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex justify-between items-center">
-          <Logo size="lg" variant="light" showText={true} />
-          <div className="hidden md:flex space-x-8">
-            <a
-              href="#features"
-              className="text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              Features
-            </a>
-            <a
-              href="#how-it-works"
-              className="text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              How it Works
-            </a>
-            <a
-              href="/privacy"
-              className="text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              Privacy
-            </a>
-          </div>
+    <main className="min-h-screen overflow-hidden bg-[#080806] text-stone-100">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.16),transparent_42%),linear-gradient(180deg,rgba(255,255,255,0.045),transparent_55%)]" />
+      <div className="pointer-events-none absolute left-1/2 top-20 h-[1px] w-[78vw] -translate-x-1/2 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+
+      <nav className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-5 py-6 sm:px-8">
+        <Logo size="lg" variant="white" showText={true} />
+        <div className="hidden items-center gap-8 md:flex">
+          <a
+            href="#practice"
+            className="text-sm text-stone-400 transition hover:text-stone-100"
+          >
+            Practice
+          </a>
+          <a
+            href="#loops"
+            className="text-sm text-stone-400 transition hover:text-stone-100"
+          >
+            Loops
+          </a>
+          <a
+            href="#upgrade"
+            className="text-sm text-stone-400 transition hover:text-stone-100"
+          >
+            Pro
+          </a>
         </div>
+        <UpgradeButton />
       </nav>
 
-      {/* Hero Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center space-y-8">
-          {/* Main Headline */}
-          <div className="space-y-6">
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900 leading-tight">
-              Reclaim Your
-              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
-                Focus
-              </span>
-            </h1>
-            <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-              Transform your YouTube playlists into distraction-free learning
-              sessions. No recommendations, just pure focus on what matters.
-            </p>
+      <section className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 px-5 pb-24 pt-14 sm:px-8 lg:grid-cols-[1fr_0.86fr] lg:pb-32 lg:pt-24">
+        <div className="max-w-3xl">
+          <div className="mb-7 inline-flex rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs font-medium uppercase tracking-[0.28em] text-amber-100/80">
+            Berlin minimalist studio
           </div>
+          <h1 className="max-w-4xl text-5xl font-medium leading-[0.95] tracking-[-0.055em] text-stone-50 sm:text-6xl lg:text-7xl">
+            Master YouTube videos section by section.
+          </h1>
+          <p className="mt-7 max-w-2xl text-lg leading-8 text-stone-400 sm:text-xl">
+            Import a playlist, create five precise practice loops for free, and
+            turn long videos into a calm daily practice library.
+          </p>
+          <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center">
+            <GoogleSignInButton />
+            <a
+              href="#practice"
+              className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/[0.03] px-6 py-3 text-sm font-medium text-stone-200 transition hover:bg-white/[0.06]"
+            >
+              See the workflow
+            </a>
+          </div>
+          <p className="mt-5 text-sm text-stone-500">
+            Free: 5 saved practice loops. Pro unlocks unlimited loops and
+            imports.
+          </p>
+        </div>
 
-          {/* CTA Section */}
-          <SignInCTA />
+        <div className="relative" id="loops">
+          <div className="absolute -inset-6 rounded-[2rem] bg-amber-300/5 blur-3xl" />
+          <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#10100d]/90 shadow-2xl shadow-black/50 backdrop-blur">
+            <div className="aspect-video bg-[linear-gradient(135deg,#151512,#0a0a08)] p-4">
+              <div className="flex h-full flex-col justify-between rounded-2xl border border-white/10 bg-black/40 p-4">
+                <div className="flex items-center justify-between text-xs text-stone-500">
+                  <span>Imported lesson</span>
+                  <span className="font-mono">06:44</span>
+                </div>
+                <div>
+                  <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full w-[48%] rounded-full bg-amber-300" />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-stone-200">
+                        Jazz comping practice
+                      </p>
+                      <p className="mt-1 font-mono text-xs text-stone-500">
+                        03:04 — 03:37
+                      </p>
+                    </div>
+                    <div className="grid h-11 w-11 place-items-center rounded-full bg-stone-100 text-stone-950">
+                      ▶
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 p-5">
+              {loopRows.map((row) => (
+                <div
+                  key={row.title}
+                  className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/[0.035] px-4 py-3"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-stone-200">
+                      {row.title}
+                    </p>
+                    <p className="mt-1 font-mono text-xs text-stone-500">
+                      {row.time}
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-white/10 px-2.5 py-1 text-xs text-stone-400">
+                    {row.state}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Features Section */}
       <section
-        id="features"
-        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20"
+        id="practice"
+        className="relative z-10 border-y border-white/[0.06] bg-white/[0.025]"
       >
-        <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold text-gray-900 mb-4">
-            Why Choose SavedTube?
-          </h2>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Built for learners, creators, and anyone who wants to make the most
-            of their time
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-8">
-          {/* Feature 1 */}
-          <div className="text-center space-y-4">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
-              <svg
-                className="w-8 h-8 text-blue-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                />
-              </svg>
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900">
-              Distraction-Free
-            </h3>
-            <p className="text-gray-600">
-              No recommendations, no sidebars. Just your content and your focus.
-            </p>
-          </div>
-
-          {/* Feature 2 */}
-          <div className="text-center space-y-4">
-            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto">
-              <svg
-                className="w-8 h-8 text-purple-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900">
-              Progress Tracking
-            </h3>
-            <p className="text-gray-600">
-              Keep track of what you&apos;ve watched and pick up exactly where
-              you left off.
-            </p>
-          </div>
-
-          {/* Feature 3 */}
-          <div className="text-center space-y-4">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-              <svg
-                className="w-8 h-8 text-green-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                />
-              </svg>
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900">
-              Your Playlists
-            </h3>
-            <p className="text-gray-600">
-              Access all your saved YouTube playlists in one organized, focused
-              interface.
-            </p>
-          </div>
+        <div className="mx-auto grid max-w-7xl gap-5 px-5 py-16 sm:px-8 lg:grid-cols-3">
+          {featureCards.map((feature) => (
+            <article
+              key={feature.title}
+              className="rounded-[1.5rem] border border-white/10 bg-[#10100d] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+            >
+              <p className="font-mono text-xs text-amber-200/70">
+                {feature.eyebrow}
+              </p>
+              <h2 className="mt-5 text-2xl font-medium tracking-[-0.03em] text-stone-100">
+                {feature.title}
+              </h2>
+              <p className="mt-4 leading-7 text-stone-400">{feature.body}</p>
+            </article>
+          ))}
         </div>
       </section>
 
-      {/* How It Works Section */}
       <section
-        id="how-it-works"
-        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 bg-white"
+        id="upgrade"
+        className="relative z-10 mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28"
       >
-        <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold text-gray-900 mb-4">
-            How It Works
-          </h2>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Get started in just 3 simple steps
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-8">
-          {/* Step 1 */}
-          <div className="text-center space-y-4">
-            <div className="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto text-xl font-bold">
-              1
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900">Sign In</h3>
-            <p className="text-gray-600">
-              Connect with your Google account to access your YouTube playlists
+        <div className="grid gap-8 rounded-[2rem] border border-amber-200/15 bg-[linear-gradient(135deg,rgba(245,158,11,0.13),rgba(255,255,255,0.035)_42%,rgba(255,255,255,0.02))] p-8 lg:grid-cols-[1fr_auto] lg:items-center lg:p-10">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.24em] text-amber-100/70">
+              SavedTube Pro
+            </p>
+            <h2 className="mt-4 max-w-2xl text-3xl font-medium tracking-[-0.04em] text-stone-50 sm:text-4xl">
+              Build your full YouTube practice library.
+            </h2>
+            <p className="mt-4 max-w-2xl leading-7 text-stone-400">
+              Upgrade when your five free loops are full. Keep unlimited
+              practice loops, playlist imports, notes, and focused practice
+              sessions.
             </p>
           </div>
-
-          {/* Step 2 */}
-          <div className="text-center space-y-4">
-            <div className="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto text-xl font-bold">
-              2
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900">
-              Select Playlist
-            </h3>
-            <p className="text-gray-600">
-              Choose from your saved playlists and start watching
-              distraction-free
+          <div className="rounded-3xl border border-white/10 bg-black/25 p-5 text-center">
+            <p className="text-sm text-stone-500">Starting at</p>
+            <p className="mt-1 text-4xl font-medium tracking-[-0.04em] text-stone-50">
+              €5
             </p>
-          </div>
-
-          {/* Step 3 */}
-          <div className="text-center space-y-4">
-            <div className="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto text-xl font-bold">
-              3
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900">
-              Focus & Learn
-            </h3>
-            <p className="text-gray-600">
-              Enjoy your content without distractions and track your progress
-            </p>
+            <p className="text-sm text-stone-500">per month</p>
+            <button className="mt-5 w-full rounded-full bg-stone-100 px-6 py-3 text-sm font-medium text-stone-950 transition hover:bg-white">
+              Upgrade to Pro
+            </button>
           </div>
         </div>
       </section>
-
-      {/* Final CTA Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center space-y-8">
-          <h2 className="text-4xl font-bold text-gray-900">
-            Ready to Reclaim Your Focus?
-          </h2>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Join thousands of learners who have already transformed their
-            YouTube experience
-          </p>
-          <SignInCTA />
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-gray-50 border-t border-gray-200 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-            <div className="flex items-center space-x-6">
-              <Logo size="md" variant="light" showText={false} />
-              <span className="text-gray-600">
-                © 2024 SavedTube. All rights reserved.
-              </span>
-            </div>
-            <div className="flex space-x-6">
-              <a
-                href="/privacy"
-                className="text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                Privacy Policy
-              </a>
-              <a
-                href="/terms"
-                className="text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                Terms of Service
-              </a>
-              <a
-                href="mailto:support@savedtube.com"
-                className="text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                Support
-              </a>
-            </div>
-          </div>
-        </div>
-      </footer>
     </main>
   );
 }
