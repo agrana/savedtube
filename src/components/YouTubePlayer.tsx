@@ -208,10 +208,9 @@ export function YouTubePlayer({
     onSeekComplete?.();
   }, [isPlayerReady, seekToSeconds, seekToToken, onSeekComplete]);
 
-  // Interval playback monitoring
+  // Current-time + interval playback monitoring
   useEffect(() => {
-    if (!isPlayerReady || !playerRef.current || intervals.length === 0) {
-      // Clear monitoring if no intervals
+    if (!isPlayerReady || !playerRef.current) {
       if (intervalCheckRef.current) {
         clearInterval(intervalCheckRef.current);
         intervalCheckRef.current = null;
@@ -224,7 +223,9 @@ export function YouTubePlayer({
       (a, b) => a.startTime - b.startTime
     );
 
-    // Set up monitoring interval
+    // Set up monitoring interval. Keep reporting current time even before any
+    // intervals exist so the interval manager can capture start/end while the
+    // user watches the video.
     intervalCheckRef.current = setInterval(() => {
       if (!playerRef.current) return;
 
@@ -232,11 +233,13 @@ export function YouTubePlayer({
         const currentTime = playerRef.current.getCurrentTime();
         const playerState = playerRef.current.getPlayerState();
 
-        // Only monitor when playing
-        if (playerState !== window.YT.PlayerState.PLAYING) return;
-
-        // Update current time for parent component
+        // Always update current time for parent component
         onCurrentTimeUpdate?.(currentTime);
+
+        if (sortedIntervals.length === 0) return;
+
+        // Only apply interval playback behavior when playing
+        if (playerState !== window.YT.PlayerState.PLAYING) return;
 
         // Find which interval we should be in
         let targetIntervalIndex = -1;
