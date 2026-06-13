@@ -64,4 +64,4 @@ jobs:
             exit 1
           fi
 
-          supabase db push --db-url "${SUPABASE_DB_URL}"
+          supabase db push --include-all --db-url "${SUPABASE_DB_URL}"

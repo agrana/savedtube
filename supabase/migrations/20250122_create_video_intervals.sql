@@ -15,17 +15,57 @@ CREATE TABLE IF NOT EXISTS public.video_intervals (
 ALTER TABLE public.video_intervals ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for user-specific data access
-CREATE POLICY "users_can_view_own_intervals" ON public.video_intervals
-    FOR SELECT USING (auth.uid() = user_id);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE schemaname = 'public'
+          AND tablename = 'video_intervals'
+          AND policyname = 'users_can_view_own_intervals'
+    ) THEN
+        CREATE POLICY "users_can_view_own_intervals" ON public.video_intervals
+            FOR SELECT USING (auth.uid() = user_id);
+    END IF;
+END $$;
 
-CREATE POLICY "users_can_insert_own_intervals" ON public.video_intervals
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE schemaname = 'public'
+          AND tablename = 'video_intervals'
+          AND policyname = 'users_can_insert_own_intervals'
+    ) THEN
+        CREATE POLICY "users_can_insert_own_intervals" ON public.video_intervals
+            FOR INSERT WITH CHECK (auth.uid() = user_id);
+    END IF;
+END $$;
 
-CREATE POLICY "users_can_update_own_intervals" ON public.video_intervals
-    FOR UPDATE USING (auth.uid() = user_id);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE schemaname = 'public'
+          AND tablename = 'video_intervals'
+          AND policyname = 'users_can_update_own_intervals'
+    ) THEN
+        CREATE POLICY "users_can_update_own_intervals" ON public.video_intervals
+            FOR UPDATE USING (auth.uid() = user_id);
+    END IF;
+END $$;
 
-CREATE POLICY "users_can_delete_own_intervals" ON public.video_intervals
-    FOR DELETE USING (auth.uid() = user_id);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE schemaname = 'public'
+          AND tablename = 'video_intervals'
+          AND policyname = 'users_can_delete_own_intervals'
+    ) THEN
+        CREATE POLICY "users_can_delete_own_intervals" ON public.video_intervals
+            FOR DELETE USING (auth.uid() = user_id);
+    END IF;
+END $$;
 
 -- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_video_intervals_user_id ON public.video_intervals(user_id);
@@ -34,7 +74,8 @@ CREATE INDEX IF NOT EXISTS idx_video_intervals_user_video ON public.video_interv
 CREATE INDEX IF NOT EXISTS idx_video_intervals_order ON public.video_intervals(user_id, video_id, order_index);
 
 -- Add updated_at trigger
-CREATE TRIGGER video_intervals_updated_at 
-    BEFORE UPDATE ON public.video_intervals 
-    FOR EACH ROW 
+DROP TRIGGER IF EXISTS video_intervals_updated_at ON public.video_intervals;
+CREATE TRIGGER video_intervals_updated_at
+    BEFORE UPDATE ON public.video_intervals
+    FOR EACH ROW
     EXECUTE FUNCTION public.handle_updated_at();
