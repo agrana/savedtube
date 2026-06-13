@@ -26,6 +26,55 @@ interface PlaylistItem {
   };
 }
 
+const getLocalIntervalNamesKey = (videoId: string) =>
+  `savedtube:interval-names:${videoId}`;
+
+const readLocalIntervalNames = (videoId: string): Record<string, string> => {
+  if (typeof window === 'undefined') return {};
+
+  try {
+    return JSON.parse(
+      window.localStorage.getItem(getLocalIntervalNamesKey(videoId)) || '{}'
+    );
+  } catch {
+    return {};
+  }
+};
+
+const writeLocalIntervalName = (
+  videoId: string,
+  intervalId: string,
+  name: string
+) => {
+  if (typeof window === 'undefined') return;
+
+  const names = readLocalIntervalNames(videoId);
+  const trimmedName = name.trim();
+
+  if (trimmedName) {
+    names[intervalId] = trimmedName;
+  } else {
+    delete names[intervalId];
+  }
+
+  window.localStorage.setItem(
+    getLocalIntervalNamesKey(videoId),
+    JSON.stringify(names)
+  );
+};
+
+const mergeLocalIntervalNames = (
+  videoId: string,
+  intervals: VideoInterval[]
+): VideoInterval[] => {
+  const localNames = readLocalIntervalNames(videoId);
+
+  return intervals.map((interval) => ({
+    ...interval,
+    name: interval.name || localNames[interval.id] || null,
+  }));
+};
+
 export default function WatchPage() {
   const { data: session, status } = useSession();
   const params = useParams();
@@ -83,7 +132,7 @@ export default function WatchPage() {
         throw new Error('Failed to fetch intervals');
       }
       const data = await response.json();
-      setIntervals(data.intervals || []);
+      setIntervals(mergeLocalIntervalNames(videoId, data.intervals || []));
     } catch (error) {
       console.error('Error fetching intervals:', error);
     }
@@ -126,21 +175,36 @@ export default function WatchPage() {
   };
 
   const handleRenameInterval = async (intervalId: string, name: string) => {
+    const trimmedName = name.trim();
+
+    // Keep the UI usable even if the production database has not received the
+    // optional `video_intervals.name` migration yet. The API path remains the
+    // source of truth when available; localStorage is a temporary per-browser
+    // fallback so users can still rename loops instead of hitting a hard error.
+    writeLocalIntervalName(videoId, intervalId, trimmedName);
+    setIntervals((currentIntervals) =>
+      currentIntervals.map((interval) =>
+        interval.id === intervalId
+          ? { ...interval, name: trimmedName || null }
+          : interval
+      )
+    );
+
     try {
       const response = await fetch('/api/vid-intervals', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: intervalId, name }),
+        body: JSON.stringify({ id: intervalId, name: trimmedName || null }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to rename interval');
+        console.warn('Interval rename saved locally only');
+        return;
       }
 
       await fetchIntervals();
     } catch (error) {
-      console.error('Error renaming interval:', error);
-      throw error;
+      console.warn('Interval rename saved locally only:', error);
     }
   };
 
