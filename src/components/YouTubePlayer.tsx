@@ -322,9 +322,9 @@ export function YouTubePlayer({
         className="absolute top-0 left-0 w-full h-full"
       />
       {!isPlayerReady && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-          <div className="text-white text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+        <div className="absolute inset-0 flex items-center justify-center bg-[#10100d]">
+          <div className="text-center text-stone-100">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-200 mx-auto mb-4"></div>
             <p>Loading video...</p>
           </div>
         </div>

@@ -372,21 +372,23 @@ export default function WatchPage() {
 
   if (status === 'loading' || isLoading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white"></div>
+      <div className="min-h-screen bg-[#080806] text-stone-100 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-24 w-24 border-b-2 border-amber-200"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center text-white">
-          <h1 className="text-2xl font-bold mb-4">Error</h1>
-          <p className="mb-4">{error}</p>
+      <div className="min-h-screen bg-[#080806] text-stone-100 flex items-center justify-center px-5">
+        <div className="rounded-[2rem] border border-red-300/20 bg-[#10100d]/90 p-8 text-center shadow-2xl shadow-black/50">
+          <h1 className="text-2xl font-medium tracking-[-0.03em] text-red-100 mb-4">
+            Error
+          </h1>
+          <p className="text-red-200/80 mb-5">{error}</p>
           <Link
             href="/dashboard"
-            className="px-4 py-2 text-sm font-medium text-black bg-white rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white"
+            className="rounded-full bg-stone-100 px-5 py-2.5 text-sm font-medium text-stone-950 transition hover:bg-white"
           >
             Back to Dashboard
           </Link>
@@ -400,31 +402,34 @@ export default function WatchPage() {
   const hasPrevious = currentIndex > 0;
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="relative min-h-screen overflow-hidden bg-[#080806] text-stone-100">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.14),transparent_42%),linear-gradient(180deg,rgba(255,255,255,0.045),transparent_55%)]" />
+      <div className="pointer-events-none absolute left-1/2 top-20 h-[1px] w-[78vw] -translate-x-1/2 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+
       {/* Minimal header */}
-      <div className="absolute top-0 left-0 right-0 z-10 bg-black bg-opacity-50 backdrop-blur-sm">
-        <div className="flex items-center justify-between p-4">
-          <div className="flex items-center space-x-4">
+      <div className="absolute left-0 right-0 top-0 z-10 border-b border-white/[0.06] bg-[#080806]/70 backdrop-blur-xl">
+        <div className="flex items-center justify-between gap-4 px-5 py-4 sm:px-8">
+          <div className="flex min-w-0 items-center gap-4">
             <Link
               href={`/p/${playlistId}`}
-              className="text-white hover:text-gray-300 transition-colors"
+              className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-2 text-sm font-medium text-stone-300 transition hover:bg-white/[0.06] hover:text-stone-50"
             >
-              ← Back to Playlist
+              ← Playlist
             </Link>
             {currentItem && (
-              <div className="text-white">
-                <h1 className="text-lg font-medium truncate max-w-md">
+              <div className="min-w-0">
+                <h1 className="max-w-[42vw] truncate text-base font-medium tracking-[-0.02em] text-stone-50 sm:text-lg">
                   {currentItem.snippet.title}
                 </h1>
-                <p className="text-sm text-gray-300">
+                <p className="truncate text-sm text-stone-400">
                   {currentItem.snippet.channelTitle}
                 </p>
               </div>
             )}
           </div>
 
-          <div className="flex items-center space-x-4">
-            <span className="text-white text-sm">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <span className="hidden font-mono text-xs uppercase tracking-[0.18em] text-amber-100/60 sm:inline">
               {currentIndex + 1} of {playlistItems.length}
             </span>
             <button
@@ -432,34 +437,34 @@ export default function WatchPage() {
               role="switch"
               aria-checked={autoplayEnabled}
               onClick={() => setAutoplayEnabled((prev) => !prev)}
-              className="flex items-center space-x-2 text-white text-xs sm:text-sm hover:text-gray-200 transition-colors"
+              className="flex items-center gap-2 text-xs text-stone-300 transition hover:text-stone-50 sm:text-sm"
               title="Toggle autoplay"
             >
               <span className="hidden sm:inline">Autoplay</span>
               <span
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                  autoplayEnabled ? 'bg-white' : 'bg-gray-600'
+                className={`relative inline-flex h-5 w-9 items-center rounded-full border transition-colors ${
+                  autoplayEnabled
+                    ? 'border-amber-200/30 bg-amber-300/30'
+                    : 'border-white/10 bg-white/[0.06]'
                 }`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-black transition-transform ${
+                  className={`inline-block h-4 w-4 transform rounded-full bg-stone-100 transition-transform ${
                     autoplayEnabled ? 'translate-x-4' : 'translate-x-1'
                   }`}
                 />
               </span>
             </button>
-            <div className="text-white text-xs opacity-70">
-              <span className="hidden sm:inline">
-                ← → to navigate, Esc to exit
-              </span>
+            <div className="hidden text-xs text-stone-500 lg:block">
+              ← → navigate · Esc exit
             </div>
           </div>
         </div>
       </div>
 
       {/* Video player */}
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="w-full max-w-6xl">
+      <div className="relative z-0 flex min-h-screen items-center justify-center px-5 py-28 sm:px-8">
+        <div className="w-full max-w-6xl overflow-hidden rounded-[2rem] border border-white/10 bg-[#10100d]/90 p-2 shadow-2xl shadow-black/50">
           <YouTubePlayer
             videoId={videoId}
             autoPlay={autoplayEnabled}
@@ -488,15 +493,15 @@ export default function WatchPage() {
       </div>
 
       {/* Navigation controls */}
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10">
-        <div className="flex items-center space-x-4 bg-black bg-opacity-50 backdrop-blur-sm rounded-full px-6 py-3">
+      <div className="absolute bottom-8 left-1/2 z-10 -translate-x-1/2 transform">
+        <div className="flex items-center gap-4 rounded-full border border-white/10 bg-[#10100d]/85 px-5 py-3 shadow-2xl shadow-black/40 backdrop-blur-xl">
           <button
             onClick={goToPrevious}
             disabled={!hasPrevious}
-            className={`p-2 rounded-full transition-colors ${
+            className={`rounded-full p-2 transition ${
               hasPrevious
-                ? 'text-white hover:bg-white hover:text-black'
-                : 'text-gray-500 cursor-not-allowed'
+                ? 'text-stone-100 hover:bg-white hover:text-stone-950'
+                : 'cursor-not-allowed text-stone-600'
             }`}
             title="Previous video"
           >
@@ -515,17 +520,17 @@ export default function WatchPage() {
             </svg>
           </button>
 
-          <div className="text-white text-sm">
+          <div className="font-mono text-sm text-stone-300">
             {currentIndex + 1} / {playlistItems.length}
           </div>
 
           <button
             onClick={goToNext}
             disabled={!hasNext}
-            className={`p-2 rounded-full transition-colors ${
+            className={`rounded-full p-2 transition ${
               hasNext
-                ? 'text-white hover:bg-white hover:text-black'
-                : 'text-gray-500 cursor-not-allowed'
+                ? 'text-stone-100 hover:bg-white hover:text-stone-950'
+                : 'cursor-not-allowed text-stone-600'
             }`}
             title="Next video"
           >
@@ -549,7 +554,7 @@ export default function WatchPage() {
       {/* Interval Toggle Button */}
       <button
         onClick={() => setShowIntervalPanel(!showIntervalPanel)}
-        className="fixed top-20 right-4 z-30 p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg transition-colors"
+        className="fixed right-5 top-24 z-30 rounded-full border border-amber-200/25 bg-amber-300/15 p-3 text-amber-100 shadow-2xl shadow-black/40 transition hover:bg-amber-300/20"
         title="Manage time intervals"
       >
         <svg
