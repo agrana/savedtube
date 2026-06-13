@@ -24,6 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_playlist_item_edits_custom_order
 -- Authorization is enforced in API routes with NextAuth session checks
 ALTER TABLE public.playlist_item_edits DISABLE ROW LEVEL SECURITY;
 
+DROP TRIGGER IF EXISTS playlist_item_edits_updated_at ON public.playlist_item_edits;
 CREATE TRIGGER playlist_item_edits_updated_at
   BEFORE UPDATE ON public.playlist_item_edits
   FOR EACH ROW
