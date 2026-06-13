@@ -24,7 +24,7 @@ BEGIN
           AND policyname = 'users_can_view_own_intervals'
     ) THEN
         CREATE POLICY "users_can_view_own_intervals" ON public.video_intervals
-            FOR SELECT USING (auth.uid() = user_id);
+            FOR SELECT USING (auth.uid()::text = user_id::text);
     END IF;
 END $$;
 
@@ -37,7 +37,7 @@ BEGIN
           AND policyname = 'users_can_insert_own_intervals'
     ) THEN
         CREATE POLICY "users_can_insert_own_intervals" ON public.video_intervals
-            FOR INSERT WITH CHECK (auth.uid() = user_id);
+            FOR INSERT WITH CHECK (auth.uid()::text = user_id::text);
     END IF;
 END $$;
 
@@ -50,7 +50,7 @@ BEGIN
           AND policyname = 'users_can_update_own_intervals'
     ) THEN
         CREATE POLICY "users_can_update_own_intervals" ON public.video_intervals
-            FOR UPDATE USING (auth.uid() = user_id);
+            FOR UPDATE USING (auth.uid()::text = user_id::text);
     END IF;
 END $$;
 
@@ -63,7 +63,7 @@ BEGIN
           AND policyname = 'users_can_delete_own_intervals'
     ) THEN
         CREATE POLICY "users_can_delete_own_intervals" ON public.video_intervals
-            FOR DELETE USING (auth.uid() = user_id);
+            FOR DELETE USING (auth.uid()::text = user_id::text);
     END IF;
 END $$;
 
