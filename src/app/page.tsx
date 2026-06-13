@@ -1,6 +1,6 @@
 'use client';
 
-import { signIn } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
 import Logo from '@/components/Logo';
 
 const DASHBOARD_CALLBACK_URL = '/dashboard';
@@ -53,13 +53,30 @@ function GoogleIcon() {
 }
 
 function GoogleSignInButton() {
+  const { status } = useSession();
+  const isSignedIn = status === 'authenticated';
+  const isCheckingSession = status === 'loading';
+
   return (
     <button
-      onClick={() => signIn('google', { callbackUrl: DASHBOARD_CALLBACK_URL })}
-      className="group inline-flex items-center justify-center gap-3 rounded-full border border-white/10 bg-stone-100 px-6 py-3 text-sm font-medium text-stone-950 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_16px_60px_rgba(0,0,0,0.45)] transition duration-200 hover:bg-white hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_20px_80px_rgba(245,158,11,0.12)]"
+      type="button"
+      disabled={isCheckingSession}
+      onClick={() => {
+        if (isSignedIn) {
+          window.location.href = DASHBOARD_CALLBACK_URL;
+          return;
+        }
+
+        signIn('google', { callbackUrl: DASHBOARD_CALLBACK_URL });
+      }}
+      className="group inline-flex items-center justify-center gap-3 rounded-full border border-white/10 bg-stone-100 px-6 py-3 text-sm font-medium text-stone-950 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_16px_60px_rgba(0,0,0,0.45)] transition duration-200 hover:bg-white hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_20px_80px_rgba(245,158,11,0.12)] disabled:cursor-wait disabled:opacity-70"
     >
       <GoogleIcon />
-      Start practicing
+      {isCheckingSession
+        ? 'Checking session...'
+        : isSignedIn
+          ? 'Go to dashboard'
+          : 'Start practicing'}
       <span className="text-stone-500 transition group-hover:translate-x-0.5">
         →
       </span>
