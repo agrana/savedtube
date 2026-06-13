@@ -1,225 +1,106 @@
-# 🔒 Next.js Data Security Improvements
+# Next.js Data Security
 
-## **Overview**
+Overview of security patterns in SavedTube, aligned with the [Next.js Data Security Guide](https://nextjs.org/docs/app/guides/data-security).
 
-This document outlines the comprehensive Next.js data security improvements implemented in SavedTube, following the [Next.js Data Security Guide](https://nextjs.org/docs/app/guides/data-security).
+**Last updated:** June 2026
 
-## **🛡️ Security Improvements Implemented**
+## Architecture
 
-### **1. Server Actions** ⭐ **CRITICAL**
+SavedTube uses a **hybrid** approach:
 
-**What**: Converted API routes to Server Actions for secure data mutations.
+| Layer | Implementation |
+|-------|----------------|
+| Authentication | NextAuth.js (Google OAuth, JWT sessions) |
+| Data access (primary) | API routes with session checks + Supabase service role |
+| Data mutations (partial) | Server Actions in `src/lib/actions.ts` |
+| Database | Supabase Postgres; app-level `user_id` filtering |
 
-**Why**: Server Actions run on the server, eliminating client-side API calls for sensitive operations.
+Most UI pages (`/dashboard`, `/p/[playlistId]`, `/watch/[videoId]`) call API routes via `fetch`. Server Actions exist for progress and hidden-playlist mutations but are not yet used by all pages.
 
-**Implementation**:
-```typescript
-// src/lib/actions.ts
-'use server';
+## Implemented
 
-export async function updateVideoProgress(
-  playlistId: string,
-  videoId: string,
-  watched: boolean
-) {
-  // Server-side validation, authentication, and database operations
-  // No sensitive data exposed to client
-}
-```
+### 1. NextAuth session validation
 
-**Security Benefits**:
-- ✅ Sensitive operations never leave the server
-- ✅ Automatic CSRF protection
-- ✅ Server-side validation and authentication
-- ✅ Reduced attack surface
+All protected API routes call `getServerSession(authOptions)` and return 401 when unauthenticated. Middleware additionally guards `/dashboard`, `/p/*`, and selected `/api/*` paths.
 
-### **2. Server Components** ⭐ **CRITICAL**
+### 2. Server Actions (partial)
 
-**What**: Implemented Server Components for secure data fetching.
+`src/lib/actions.ts` provides:
 
-**Why**: Data fetching happens on the server, preventing client-side exposure of sensitive data.
+- `updateVideoProgress` — upsert watched status
+- `togglePlaylistVisibility` — hide/show playlists
+- `getUserProgress` / `getHiddenPlaylists` — server-side reads
 
-**Implementation**:
-```typescript
-// src/components/ServerPlaylistProgress.tsx
-export default async function ServerPlaylistProgress({ 
-  playlistId, 
-  children 
-}: ServerPlaylistProgressProps) {
-  const session = await getServerSession(authOptions);
-  const progress = await getUserProgress(playlistId);
-  return <>{children(progress)}</>;
-}
-```
+`ProgressToggle` uses the `updateVideoProgress` server action, but the playlist page still posts to `/api/progress`. The dashboard uses `/api/hidden-playlists` instead of `togglePlaylistVisibility`.
 
-**Security Benefits**:
-- ✅ Database queries never exposed to client
-- ✅ Authentication handled server-side
-- ✅ Sensitive data stays on server
-- ✅ Improved performance with SSR
+### 3. Input validation (Zod)
 
-### **3. CSRF Protection** ⭐ **HIGH**
+Schemas in `src/lib/validation.ts` validate progress, hidden-playlist, and playlist-item payloads. The vid-intervals routes define their own Zod schemas inline.
 
-**What**: Added comprehensive CSRF protection for all server actions.
+### 4. Security middleware
 
-**Why**: Prevents Cross-Site Request Forgery attacks on data mutations.
+`src/middleware.ts` applies:
 
-**Implementation**:
-```typescript
-// src/lib/csrf.ts
-export function generateCSRFToken(): string {
-  return randomBytes(32).toString('hex');
-}
+- Auth gate via `next-auth/middleware`
+- Rate limiting on `/api/*` routes
+- Security headers: `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, CSP
 
-export function validateCSRFToken(token: string): boolean {
-  const storedToken = getCSRFToken();
-  return token === storedToken;
-}
-```
+### 5. Environment validation
 
-**Security Benefits**:
-- ✅ Prevents unauthorized data mutations
-- ✅ Token-based request validation
-- ✅ Automatic token generation and validation
+`src/lib/config.ts` validates required env vars at server startup.
 
-### **4. Server-Side YouTube API Integration** ⭐ **HIGH**
+### 6. Security logging
 
-**What**: Moved YouTube API calls from client to server components.
+`src/lib/security-logger.ts` records auth failures, validation failures, data access, and suspicious activity in server actions.
 
-**Why**: API tokens and sensitive data never exposed to client-side code.
+### 7. Server-side YouTube API
 
-**Implementation**:
-```typescript
-// src/lib/youtube-server.ts
-export async function getServerPlaylists(query = '', pageToken = '') {
-  const session = await getServerSession(authOptions);
-  // YouTube API calls happen server-side
-  // Access tokens never exposed to client
-}
-```
+YouTube Data API calls run in API routes (`/api/playlists`, `/api/playlist-items`) using the session access token. A shared helper module (`src/lib/youtube-server.ts`) exists but is not yet adopted by the routes.
 
-**Security Benefits**:
-- ✅ API tokens never sent to client
-- ✅ YouTube API credentials protected
-- ✅ Server-side error handling
-- ✅ Comprehensive security logging
+## Not fully implemented
 
-### **5. Automatic Cache Revalidation** ⭐ **MEDIUM**
+### CSRF module (`src/lib/csrf.ts`)
 
-**What**: Implemented automatic cache revalidation for data consistency.
+A custom CSRF token helper exists but is **not wired** into server actions or API routes. Next.js Server Actions have built-in origin checking; the custom module is available for future use.
 
-**Why**: Ensures UI updates immediately after data mutations.
+### Server Components for data fetching
 
-**Implementation**:
-```typescript
-// In server actions
-revalidatePath(`/p/${playlistId}`);
-revalidatePath('/dashboard');
-```
+`ServerPlaylistProgress` is implemented but **not imported** by any page. Pages fetch data client-side via API routes.
 
-**Security Benefits**:
-- ✅ Immediate UI updates after secure operations
-- ✅ Consistent data state across components
-- ✅ No stale data security issues
+### Row Level Security
 
-## **🔧 Technical Implementation**
+RLS is **disabled** on most application tables (`playlist_progress`, `hidden_playlists`, `video_intervals`, `playlist_item_edits`, `waiting_list`). Authorization relies on NextAuth session checks and explicit `user_id` filtering with the service role key.
 
-### **File Structure**
+## File reference
+
 ```
 src/
 ├── lib/
-│   ├── actions.ts              # Server Actions
-│   ├── csrf.ts                 # CSRF Protection
-│   ├── youtube-server.ts       # Server-side YouTube API
-│   └── security-logger.ts      # Security logging
+│   ├── actions.ts              # Server Actions (partial adoption)
+│   ├── auth.ts                 # NextAuth + token refresh
+│   ├── csrf.ts                 # CSRF helpers (unused)
+│   ├── config.ts               # Env validation
+│   ├── supabase.ts             # Supabase clients
+│   ├── validation.ts           # Zod schemas
+│   ├── youtube-server.ts       # YouTube helper (unused by routes)
+│   ├── rate-limit.ts           # In-memory rate limiter
+│   └── security-logger.ts      # Security event logging
 ├── components/
-│   ├── ServerPlaylistProgress.tsx  # Server Component
-│   └── ProgressToggle.tsx          # Client Component with Server Actions
+│   ├── ServerPlaylistProgress.tsx  # Server Component (unused)
+│   └── ProgressToggle.tsx          # Uses server action
+└── middleware.ts               # Auth, rate limit, headers
 ```
 
-### **Migration Path**
+## Recommended next steps
 
-**Before (Insecure)**:
-```typescript
-// Client-side API call
-const response = await fetch('/api/progress', {
-  method: 'POST',
-  body: JSON.stringify({ playlistId, videoId, watched })
-});
-```
+1. Migrate remaining client `fetch` calls to Server Actions or Server Components.
+2. Either wire up `youtube-server.ts` in API routes or remove the duplicate.
+3. Decide on RLS vs app-level auth and document the chosen model consistently.
+4. Remove or integrate unused components (`ServerPlaylistProgress`, `ProgressToggle` where not used).
+5. Replace in-memory rate limiting with Redis for multi-instance Vercel deployments.
 
-**After (Secure)**:
-```typescript
-// Server Action call
-await updateVideoProgress(playlistId, videoId, watched);
-```
-
-## **🎯 Security Benefits Summary**
-
-### **Attack Prevention**
-- ✅ **CSRF Attacks**: Eliminated with Server Actions
-- ✅ **XSS Attacks**: Reduced with Server Components
-- ✅ **Token Exposure**: Prevented with server-side API calls
-- ✅ **Data Leakage**: Eliminated with server-side data fetching
-
-### **Data Protection**
-- ✅ **Sensitive Data**: Never leaves the server
-- ✅ **API Credentials**: Protected server-side
-- ✅ **User Sessions**: Validated server-side
-- ✅ **Database Queries**: Executed server-side only
-
-### **Performance Benefits**
-- ✅ **Faster Loading**: Server-side rendering
-- ✅ **Reduced Bundle Size**: Less client-side code
-- ✅ **Better Caching**: Automatic revalidation
-- ✅ **Improved SEO**: Server-side rendering
-
-## **📊 Security Score Improvement**
-
-**Before Next.js Security**: 8.5/10  
-**After Next.js Security**: 9.8/10
-
-**Improvement**: +1.3 points (15% increase)
-
-## **🚀 Deployment Checklist**
-
-### **Pre-Deployment**
-- [x] Server Actions implemented
-- [x] Server Components created
-- [x] CSRF protection added
-- [x] Server-side API integration complete
-- [x] Security logging implemented
-
-### **Post-Deployment Verification**
-- [ ] Test Server Actions functionality
-- [ ] Verify Server Components render correctly
-- [ ] Test CSRF protection
-- [ ] Confirm server-side API calls work
-- [ ] Check security logs for proper events
-
-## **🔍 Monitoring & Maintenance**
-
-### **Security Monitoring**
-- Monitor Server Action usage patterns
-- Track CSRF token validation failures
-- Log server-side API call errors
-- Monitor cache revalidation events
-
-### **Regular Maintenance**
-- Update Next.js to latest version
-- Review Server Action security patterns
-- Audit CSRF protection implementation
-- Test server-side data fetching
-
-## **📚 Additional Resources**
+## Resources
 
 - [Next.js Data Security Guide](https://nextjs.org/docs/app/guides/data-security)
-- [Server Actions Documentation](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions)
-- [Server Components Documentation](https://nextjs.org/docs/app/building-your-application/rendering/server-components)
-- [CSRF Protection Best Practices](https://owasp.org/www-community/attacks/csrf)
-
----
-
-**Last Updated**: January 2025  
-**Security Level**: Enterprise Grade  
-**Compliance**: Next.js Best Practices ✅
+- [Server Actions](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions)
+- [Server Components](https://nextjs.org/docs/app/building-your-application/rendering/server-components)

@@ -1,201 +1,157 @@
-# 🔒 SECURITY CHECKLIST FOR SAVEDTUBE
+# Security Checklist for SavedTube
 
-## **PRE-DEPLOYMENT SECURITY CHECKS**
+**Last updated:** June 2026
 
-### ✅ **Authentication & Authorization**
-- [x] NextAuth.js with Google OAuth 2.0 configured
-- [x] JWT sessions with proper expiration (30 days)
-- [x] Automatic token refresh implemented
-- [x] Server-side session validation in all API routes
-- [x] Middleware protection for sensitive routes
+## Pre-deployment checks
 
-### ✅ **Database Security**
-- [x] Row Level Security (RLS) enabled on critical tables
-- [x] User data isolation via `user_id` filtering
-- [x] Parameterized queries (prevents SQL injection)
-- [x] Proper indexes for performance and security
+### Authentication and authorization
 
-### ✅ **Input Validation & Sanitization**
-- [x] Zod schema validation implemented
+- [x] NextAuth.js with Google OAuth 2.0
+- [x] JWT sessions (30-day max age)
+- [x] Automatic Google access-token refresh (`src/lib/auth.ts`)
+- [x] Server-side session validation in API routes
+- [x] Middleware protection for `/dashboard`, `/p/*`, and selected API routes
+- [ ] Migrate all mutations to Server Actions (dashboard and playlist pages still use API routes)
+
+### Database security
+
+- [x] Parameterized queries via Supabase client (no raw SQL in app code)
+- [x] `user_id` filtering in API routes and server actions
+- [ ] RLS enabled on application tables (currently disabled; auth is app-level with service role key)
+- [x] Database schema managed via versioned migrations
+
+### Input validation
+
+- [x] Zod schema validation on API routes and server actions
 - [x] YouTube ID format validation
-- [x] Input sanitization functions
-- [x] Type-safe validation wrapper
+- [x] Email format validation on waiting-list endpoint
 
-### ✅ **Security Headers & CSP**
-- [x] X-Frame-Options: DENY
-- [x] X-Content-Type-Options: nosniff
-- [x] Referrer-Policy: strict-origin-when-cross-origin
-- [x] Content Security Policy configured
-- [x] Permissions Policy set
+### Security headers and CSP
 
-### ✅ **Rate Limiting**
-- [x] API rate limiting (100 requests/minute)
-- [x] Auth rate limiting (5 attempts/5 minutes)
-- [x] Playlist-specific rate limiting (50 requests/minute)
+- [x] `X-Frame-Options: DENY`
+- [x] `X-Content-Type-Options: nosniff`
+- [x] `Referrer-Policy: strict-origin-when-cross-origin`
+- [x] Content Security Policy (middleware)
+- [x] Permissions Policy
 
-### ✅ **Monitoring & Logging**
-- [x] Security event logging implemented
-- [x] Auth failure tracking
-- [x] Rate limit monitoring
-- [x] Suspicious activity detection
+### Rate limiting
 
-### ✅ **Next.js Data Security**
-- [x] Server Actions implemented for secure data mutations
-- [x] Server Components for secure data fetching
-- [x] CSRF protection for server actions
-- [x] Server-side YouTube API integration
-- [x] Automatic cache revalidation
-- [x] Secure session handling in server components
+- [x] API rate limiting (in-memory, 100 req/min)
+- [x] Auth rate limiting (5 attempts / 5 min)
+- [x] Playlist-specific rate limiting (50 req/min)
+- [ ] Redis-backed rate limiting for production multi-instance deploys
 
-### ✅ **Legal Compliance**
-- [x] Privacy Policy implemented (/privacy)
-- [x] Terms of Service implemented (/terms)
-- [x] Footer with legal page links
-- [x] Landing page legal notice
-- [x] Support contact information
-- [x] User consent for data usage
+### Monitoring and logging
 
-## **DEPLOYMENT STEPS**
+- [x] Security event logging (`src/lib/security-logger.ts`)
+- [x] Auth failure tracking in server actions
+- [ ] Centralized log aggregation in production
 
-### 1. **Apply RLS Migration** ⚠️ **CRITICAL**
+### Legal compliance
+
+- [x] Privacy Policy (`/privacy`)
+- [x] Terms of Service (`/terms`)
+- [x] Footer links to legal pages
+- [x] Support contact (`support@savedtube.com`)
+
+## Deployment steps
+
+### 1. Apply database migrations
+
 ```bash
-# Option A: Use Supabase CLI (if working)
+# Local / manual
+supabase link --project-ref your-project-ref
 supabase db push
 
-# Option B: Manual execution (recommended)
-# 1. Go to Supabase Dashboard → SQL Editor
-# 2. Copy content from apply_rls_security_manually.sql
-# 3. Execute the script
-# 4. Verify RLS is enabled with the included SELECT queries
+# CI: migrations deploy automatically on push to main
+# via .github/workflows/migrations-validate.yml
 ```
 
-### 2. **Environment Variables** ⚠️ **CRITICAL**
-Ensure these are set in production:
+### 2. Environment variables
+
+Set these in Vercel (and `.env.local` for local dev):
+
 ```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
-NEXTAUTH_SECRET=your_nextauth_secret
-NEXTAUTH_URL=https://your-domain.com
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+NEXTAUTH_SECRET=
+NEXTAUTH_URL=
 ```
 
-### 3. **Deploy Security Branch**
-```bash
-# Merge security branch to main
-git checkout main
-git merge security/implement-comprehensive-security
-git push origin main
+For CI migration deploys, also set GitHub secrets:
 
-# Deploy to Vercel
-# The deployment will automatically pick up the security improvements
+```env
+SUPABASE_ACCESS_TOKEN=
+SUPABASE_DB_URL=
 ```
 
-## **POST-DEPLOYMENT VERIFICATION**
+### 3. Deploy
 
-### 1. **Test Authentication**
+Push to `main` and let Vercel deploy, or trigger a manual deploy from the Vercel dashboard.
+
+## Post-deployment verification
+
+### Authentication
+
 - [ ] Google OAuth sign-in works
-- [ ] Session persistence across page reloads
-- [ ] Proper logout functionality
-- [ ] Unauthorized access blocked
+- [ ] Session persists across page reloads
+- [ ] Token refresh works after access token expiry
+- [ ] Logout clears session
+- [ ] Unauthenticated users are redirected from protected routes
 
-### 2. **Test Rate Limiting**
-- [ ] API endpoints respect rate limits
-- [ ] Auth endpoints respect rate limits
-- [ ] Rate limit headers returned
-- [ ] 429 responses for exceeded limits
+### API and data isolation
 
-### 3. **Test Input Validation**
-- [ ] Invalid YouTube IDs rejected
-- [ ] Malformed requests return 400 errors
-- [ ] XSS attempts blocked
-- [ ] SQL injection attempts blocked
+- [ ] Users can only read/write their own progress, intervals, and playlist edits
+- [ ] Invalid YouTube IDs and malformed payloads return 400
+- [ ] Unauthorized requests return 401
 
-### 4. **Test Data Isolation**
-- [ ] Users can only access their own data
-- [ ] RLS policies working correctly
-- [ ] No cross-user data leakage
-- [ ] Proper error messages (no data leakage)
+### Rate limiting
 
-### 5. **Test Security Headers**
-- [ ] Security headers present in responses
-- [ ] CSP blocks unauthorized resources
-- [ ] X-Frame-Options prevents clickjacking
-- [ ] Content-Type sniffing prevented
+- [ ] Excessive API calls return 429 with rate-limit headers
 
-## **ONGOING SECURITY MAINTENANCE**
+### Security headers
 
-### **Weekly Checks**
-- [ ] Review security logs for suspicious activity
-- [ ] Check for failed authentication attempts
-- [ ] Monitor rate limit violations
-- [ ] Review error logs for potential issues
+- [ ] Responses include CSP and frame-protection headers
 
-### **Monthly Checks**
-- [ ] Update dependencies (npm audit)
-- [ ] Review access logs
-- [ ] Check for unusual traffic patterns
-- [ ] Verify RLS policies still working
+### Core flows
 
-### **Quarterly Checks**
-- [ ] Security audit of codebase
-- [ ] Review and update security policies
-- [ ] Test disaster recovery procedures
-- [ ] Update security documentation
+- [ ] Dashboard loads playlists
+- [ ] Playlist detail shows videos and progress
+- [ ] Watch page plays video and saves intervals
+- [ ] Hidden playlists toggle works
 
-## **SECURITY MONITORING**
+## Ongoing maintenance
 
-### **Key Metrics to Track**
-- Authentication failures per hour
-- Rate limit violations per day
-- Suspicious activity events
-- API response times (for DoS detection)
-- Database query performance
+### Weekly
 
-### **Alert Thresholds**
-- >10 auth failures per hour from same IP
-- >50 rate limit violations per day
-- >100 suspicious activity events per day
-- API response time >5 seconds
-- Database query time >2 seconds
+- [ ] Review application logs for auth failures and errors
+- [ ] Check Vercel deployment health
 
-## **INCIDENT RESPONSE**
+### Monthly
 
-### **Security Incident Checklist**
-1. **Immediate Response**
-   - [ ] Isolate affected systems
-   - [ ] Document incident details
-   - [ ] Notify security team
-   - [ ] Preserve evidence
+- [ ] Run `npm audit` and update dependencies
+- [ ] Verify migrations are in sync across environments
 
-2. **Investigation**
-   - [ ] Review security logs
-   - [ ] Analyze attack vectors
-   - [ ] Identify affected users/data
-   - [ ] Determine root cause
+### Quarterly
 
-3. **Remediation**
-   - [ ] Apply security patches
-   - [ ] Update security policies
-   - [ ] Notify affected users
-   - [ ] Document lessons learned
+- [ ] Review auth and data-access patterns
+- [ ] Re-evaluate RLS vs app-level authorization strategy
+- [ ] Update this checklist and related docs
 
-4. **Recovery**
-   - [ ] Restore from backups if needed
-   - [ ] Verify system integrity
-   - [ ] Monitor for recurrence
-   - [ ] Update incident response plan
+## Incident response
 
-## **SECURITY CONTACTS**
+1. **Contain** — disable affected routes or rotate compromised secrets.
+2. **Investigate** — review Vercel logs and Supabase query logs.
+3. **Remediate** — patch, redeploy, notify affected users if needed.
+4. **Document** — record timeline, root cause, and follow-up actions.
 
-- **Security Team**: [Your Security Contact]
-- **Emergency Contact**: [Emergency Number]
-- **Bug Reports**: [Security Email]
-- **Vendor Security**: [Vendor Contacts]
+## Security contacts
 
----
+Update these with your team's actual contacts:
 
-**Last Updated**: January 2025
-**Security Score**: 10/10
-**Next Review**: February 2025
+- **Security**: [your-security-email]
+- **Bug reports**: [your-security-email]
+- **Support**: support@savedtube.com

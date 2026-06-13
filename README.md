@@ -1,36 +1,74 @@
 # SavedTube
 
-A distraction-free YouTube playlist player built with Next.js, Supabase, and Google OAuth.
+A quiet YouTube practice studio for precise loops and focused sessions. Import your saved playlists, mark the useful parts of each video, and return to them for deliberate practice.
 
 ## Features
 
-- 🔐 Secure Google OAuth authentication with YouTube API access
-- 🎯 Distraction-free video player interface with YouTube IFrame Player API
-- 🎮 Keyboard shortcuts for navigation (← → arrows, Esc to exit)
-- 📱 Responsive design with modern UI
-- 🔒 Row Level Security (RLS) for data protection
-- 🚀 Deployed on Vercel with Supabase backend
-- 📊 Progress tracking for watched videos
-- 🎬 Playlist navigation with minimal distractions
+- Google OAuth sign-in with YouTube Data API access (NextAuth.js)
+- Dashboard to browse, search, and hide/show your YouTube playlists
+- Playlist detail view with watched/unwatched progress tracking
+- Per-user playlist edits: reorder videos, soft-remove items, add videos by URL
+- Distraction-reduced watch page with the YouTube IFrame Player API
+- Practice intervals: define start/end loops, rename them, loop playback, import from YouTube chapters
+- Legal pages: Privacy Policy and Terms of Service
+- Security middleware: auth protection, rate limiting, CSP and security headers
 
 ## Tech Stack
 
-- **Frontend**: Next.js 14, TypeScript, Tailwind CSS
-- **Backend**: Supabase (PostgreSQL, Auth, Storage)
-- **Authentication**: NextAuth.js with Google OAuth
+- **Frontend**: Next.js 15 (App Router, Turbopack dev server), React 19, TypeScript, Tailwind CSS 4
+- **Authentication**: NextAuth.js with Google OAuth and JWT sessions
+- **Database**: Supabase (PostgreSQL) — used as Postgres only, not Supabase Auth
+- **Validation**: Zod
 - **Deployment**: Vercel
-- **Database**: PostgreSQL with RLS policies
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── page.tsx                    # Landing page
+│   ├── dashboard/page.tsx          # Playlist browser
+│   ├── p/[playlistId]/page.tsx     # Playlist detail
+│   ├── watch/[videoId]/page.tsx    # Video player + intervals
+│   ├── privacy/page.tsx
+│   ├── terms/page.tsx
+│   └── api/                        # API routes (see below)
+├── components/                     # UI components
+└── lib/
+    ├── auth.ts                     # NextAuth config + token refresh
+    ├── supabase.ts                 # Supabase client (service role on server)
+    ├── actions.ts                  # Server Actions (partial adoption)
+    ├── validation.ts               # Zod schemas
+    └── config.ts                   # Env var validation
+supabase/migrations/                # Versioned database schema
+terraform/                          # Cloudflare DNS, email routing, Vercel domain
+```
+
+## API Routes
+
+| Route | Methods | Purpose |
+|-------|---------|---------|
+| `/api/auth/[...nextauth]` | GET, POST | NextAuth handlers |
+| `/api/playlists` | GET | Fetch user's YouTube playlists |
+| `/api/playlist-items` | GET, POST | Fetch playlist videos; reorder, remove, add |
+| `/api/progress` | GET, POST | Read/update watched status |
+| `/api/hidden-playlists` | GET, POST | Hide or show playlists on dashboard |
+| `/api/vid-intervals` | GET, POST, PATCH, DELETE | CRUD for practice intervals |
+| `/api/vid-intervals/import` | POST | Import intervals from YouTube chapters |
+| `/api/waiting-list` | POST | Collect waiting-list emails |
+
+Server Actions in `src/lib/actions.ts` provide an alternative path for progress and hidden-playlist mutations, but the dashboard and playlist pages currently use the API routes above.
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+ 
-- Supabase CLI
-- Google Cloud Console access
-- Vercel account
+- Node.js 18+
+- Supabase CLI (for migrations)
+- Google Cloud Console project with OAuth credentials
+- Vercel account (for deployment)
 
-### 1. Clone and Setup
+### 1. Clone and install
 
 ```bash
 git clone <your-repo-url>
@@ -38,147 +76,109 @@ cd savedtube
 npm install
 ```
 
-### 2. Supabase Setup
-
-1. **Create Supabase Project**
-   - Go to [supabase.com](https://supabase.com)
-   - Create a new project
-   - Note down your project URL and anon key
-
-2. **Apply Database Schema**
-   ```bash
-   # Link to your Supabase project
-   supabase link --project-ref your-project-ref
-   
-   # Apply migrations
-   supabase db push
-   ```
-
-3. **Configure Auth Settings**
-   - In Supabase Dashboard → Authentication → Settings
-   - Add your domain to Site URL (localhost:3000 for development)
-   - Configure redirect URLs
-
-### 3. Google OAuth Setup
-
-1. **Create Google Cloud Project**
-   - Go to [Google Cloud Console](https://console.cloud.google.com)
-   - Create a new project or select existing one
-
-2. **Enable Required APIs**
-   - Go to APIs & Services → Library
-   - Search for and enable these APIs:
-     - **YouTube Data API v3** (for accessing playlists and videos)
-     - **Google Identity and Access Management (IAM) API** (for OAuth)
-
-3. **Create OAuth Credentials**
-   - Go to APIs & Services → Credentials
-   - Create OAuth 2.0 Client ID
-   - Application type: Web application
-   - Add authorized redirect URIs:
-     - `http://localhost:3000/api/auth/callback/google` (development)
-     - `https://your-domain.vercel.app/api/auth/callback/google` (production)
-
-4. **Configure OAuth Consent Screen**
-   - Go to APIs & Services → OAuth consent screen
-   - User Type: External (or Internal if using Google Workspace)
-   - App name: "SavedTube"
-   - User support email: your email
-   - Developer contact information: your email
-   - Add scopes:
-     - `openid`
-     - `email`
-     - `profile`
-     - `https://www.googleapis.com/auth/youtube.readonly`
-
-### 4. Environment Variables
-
-Copy `env.example` to `.env.local` and fill in your values:
+### 2. Environment variables
 
 ```bash
 cp env.example .env.local
 ```
 
 Required variables:
-- `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase project URL
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Your Supabase anon key
-- `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase service role key
-- `GOOGLE_CLIENT_ID`: Your Google OAuth client ID
-- `GOOGLE_CLIENT_SECRET`: Your Google OAuth client secret
-- `NEXTAUTH_SECRET`: Generate with `openssl rand -base64 32`
-- `NEXTAUTH_URL`: Your app URL (localhost:3000 for development)
 
-### 5. Run Development Server
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-side only) |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
+| `NEXTAUTH_SECRET` | Generate with `openssl rand -base64 32` |
+| `NEXTAUTH_URL` | App URL (`http://localhost:3000` for local dev) |
+
+All required variables are validated at startup via `src/lib/config.ts`.
+
+### 3. Supabase database
+
+```bash
+# Link to your Supabase project
+supabase link --project-ref your-project-ref
+
+# Apply migrations
+supabase db push
+```
+
+See [supabase/README.md](supabase/README.md) for migration workflow and CI details.
+
+Authentication is handled by **NextAuth**, not Supabase Auth. You do not need to enable Google in the Supabase dashboard.
+
+### 4. Google OAuth setup
+
+1. Create a Google Cloud project and enable **YouTube Data API v3**.
+2. Create OAuth 2.0 credentials (Web application).
+3. Add authorized redirect URIs:
+   - `http://localhost:3000/api/auth/callback/google` (development)
+   - `https://your-domain.com/api/auth/callback/google` (production)
+4. Configure the OAuth consent screen with scopes:
+   - `openid`, `email`, `profile`
+   - `https://www.googleapis.com/auth/youtube.readonly`
+
+### 5. Run locally
 
 ```bash
 npm run dev
 ```
 
-Visit [http://localhost:3000](http://localhost:3000) to see your app.
+Visit [http://localhost:3000](http://localhost:3000).
 
 ### 6. Deploy to Vercel
 
-1. **Push to GitHub**
-   ```bash
-   git add .
-   git commit -m "Initial setup"
-   git push origin main
-   ```
-
-2. **Deploy on Vercel**
-   - Connect your GitHub repository
-   - Add environment variables in Vercel dashboard
-   - Deploy
-
-## Security Features
-
-- **Row Level Security (RLS)**: Users can only access their own data
-- **JWT Authentication**: Secure session management
-- **OAuth 2.0**: Industry-standard authentication
-- **Environment Variables**: Secure credential management
-- **CORS Protection**: Configured for production domains
+1. Push to your Git remote.
+2. Connect the repository in Vercel.
+3. Add the environment variables from `.env.local`.
+4. Deploy.
 
 ## Database Schema
 
-The application uses a secure `profiles` table with:
-- UUID primary key linked to Supabase Auth users
-- Automatic profile creation on signup
-- RLS policies for data isolation
-- Indexes for performance optimization
+Migrations live in `supabase/migrations/`. Main tables:
 
-## Video Player Features
+| Table | Purpose |
+|-------|---------|
+| `profiles` | User profile linked to Supabase Auth users (legacy; app auth is NextAuth) |
+| `playlist_progress` | Watched/unwatched status per user, playlist, and video |
+| `hidden_playlists` | Playlists a user has hidden from the dashboard |
+| `video_intervals` | Practice loop start/end times per user and video |
+| `playlist_item_edits` | Per-user reorder, soft-remove, and manual video additions |
+| `waiting_list` | Email signups |
 
-The distraction-free video player includes:
+User IDs are stored as **TEXT** (NextAuth `sub` claim), not UUIDs. Authorization is enforced in API routes and server actions via NextAuth session checks. The server uses the Supabase **service role key** and filters by `user_id` in application code. RLS is disabled on most application tables.
 
-- **YouTube IFrame Player API**: Compliant with YouTube Terms of Service
-- **Minimal UI**: No sidebars, comments, or recommendations
-- **Distraction-Reducing Parameters**:
-  - `modestbranding=1`: Reduces YouTube branding
-  - `rel=0`: Limits related videos to same channel
-  - `iv_load_policy=3`: Disables video annotations
-  - `showinfo=0`: Hides video title and uploader info
-- **Keyboard Navigation**: 
-  - Left/Right arrows: Navigate between videos
-  - Escape: Return to playlist
-- **Progress Tracking**: Automatic marking of watched videos
-- **Responsive Design**: Works on desktop and mobile devices
+## Security
 
-## Next Steps
+- NextAuth JWT sessions (30-day max age) with automatic Google token refresh
+- Middleware protects `/dashboard`, `/p/*`, and selected `/api/*` routes
+- Rate limiting on API routes (in-memory; use Redis for multi-instance production)
+- Zod input validation on API routes and server actions
+- Security headers and Content Security Policy via middleware
+- Privacy Policy (`/privacy`) and Terms of Service (`/terms`)
 
-1. **AI Tagging**: Add automatic video categorization
-2. **Search & Filter**: Implement advanced search functionality
-3. **Sharing**: Add playlist sharing features
-4. **Custom Playlists**: Allow users to create their own playlists
-5. **Offline Support**: Cache videos for offline viewing
+See [SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md) and [NEXTJS_SECURITY_IMPROVEMENTS.md](NEXTJS_SECURITY_IMPROVEMENTS.md) for details and deployment checks.
 
-## Contributing
+## Development Scripts
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+```bash
+npm run dev            # Start dev server (Turbopack)
+npm run build          # Production build
+npm run lint           # ESLint
+npm run type-check     # TypeScript check
+npm run check-all      # lint + type-check + build
+npm run pre-commit-full  # Full pre-commit script
+```
+
+See [LOCAL_ERROR_CHECKING.md](LOCAL_ERROR_CHECKING.md) for the local QA workflow.
+
+## Infrastructure
+
+Terraform configs in `terraform/` manage Cloudflare DNS, email forwarding, Vercel custom domain, and Supabase project references. See [terraform/README.md](terraform/README.md).
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](LICENSE).

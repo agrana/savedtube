@@ -1,19 +1,57 @@
-# Summary
+# Code Quality Notes
 
-The project uses Next.js 15 with NextAuth and Supabase for authentication and data access, but it lacks automated tests and has duplicate configuration files that could cause confusion during builds
+**Last updated:** June 2026
 
-Environment variables for Supabase are checked at startup, improving early failure detection, yet the NextAuth route stores refresh tokens without logic to refresh or rotate them, which could lead to expired sessions over time
+## Current state
 
-Protected routes are enforced via middleware, and the session context is provided globally, but the lack of a test script and minimal error handling reduce confidence in long-term reliability
+| Area | Status |
+|------|--------|
+| Next.js | 15.4.10 with App Router and Turbopack dev server |
+| Auth | NextAuth with Google OAuth and token refresh (`src/lib/auth.ts`) |
+| Env validation | `src/lib/config.ts` validates required vars at startup |
+| Type checking | `npm run type-check` (`tsc --noEmit`) |
+| Linting | ESLint + Prettier via lint-staged and husky |
+| Config files | Single `next.config.js` (no duplicate) |
+| Tests | `npm test` is a placeholder — no test suite yet |
 
-# Recomendations
+## Remaining improvements
 
-Consolidate configuration: Merge next.config.ts and next.config.js into a single file to avoid ambiguity about which settings are applied at build time
+### 1. Consolidate data access
 
-Token lifecycle management: Implement refresh-token logic in the NextAuth jwt callback so that access tokens are renewed when expired and sensitive tokens are not persisted longer than necessary
+Dashboard and playlist pages use client-side `fetch` to API routes. Server Actions and Server Components (`ServerPlaylistProgress`) exist but are not fully adopted. Pick one pattern and migrate.
 
-Environment handling: Introduce a dedicated config module (e.g., using zod or a similar library) to validate all required environment variables at runtime and prevent accidental exposure of service-role keys to the client
+### 2. Deduplicate YouTube API logic
 
-Testing and type safety: Add unit/integration tests and a test script, and consider a tsc --noEmit check to catch type errors in CI
+`src/lib/youtube-server.ts` mirrors logic in `/api/playlists` and `/api/playlist-items`. Either adopt the shared module or remove it.
 
-Robust error handling: For client routes such as the dashboard, centralize loading/error states and consider server-side rendering or React Error Boundaries to provide consistent user feedback
+### 3. Testing
+
+Add a test framework (Vitest or Jest) and cover:
+
+- Zod validation schemas
+- API route auth guards
+- Token refresh logic in `auth.ts`
+
+### 4. Rate limiting
+
+In-memory rate limiter (`src/lib/rate-limit.ts`) does not persist across Vercel instances. Use Redis (e.g. Upstash) for production.
+
+### 5. Unused code
+
+- `WaitingListForm` component (API route exists, component unused)
+- `ServerPlaylistProgress` component (not imported)
+- `src/lib/csrf.ts` (not wired into actions)
+
+Remove or integrate these to reduce confusion.
+
+### 6. RLS strategy
+
+Most tables have RLS disabled with app-level auth via service role key. Document and stick to one approach; enabling RLS would require passing NextAuth JWT claims to Supabase.
+
+## Local QA
+
+See [LOCAL_ERROR_CHECKING.md](../../LOCAL_ERROR_CHECKING.md) for the pre-commit workflow.
+
+```bash
+npm run check-all   # lint + type-check + build
+```

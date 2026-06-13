@@ -1,4 +1,6 @@
-# 🚀 Local Error Checking Guide for SavedTube
+# Local Error Checking Guide for SavedTube
+
+**Last updated:** June 2026
 
 ## 🎯 **Why Local Error Checking?**
 
@@ -194,7 +196,7 @@ Before pushing to GitHub, ensure:
 - [ ] `npm run lint` passes with no errors
 - [ ] `npm run type-check` passes with no errors  
 - [ ] `npm run build` completes successfully
-- [ ] All tests pass (when you add them)
+- [ ] All tests pass (`npm test` is currently a placeholder)
 - [ ] Code is formatted with Prettier
 
 ## 🎉 **Benefits**

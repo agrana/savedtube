@@ -1,0 +1,24 @@
+# Copy to terraform.tfvars and fill in your values.
+# Never commit terraform.tfvars to version control.
+
+domain_name          = "savedtube.com"
+app_url              = "your-app.vercel.app"
+support_email        = "your-support@gmail.com"
+contact_email        = "your-contact@gmail.com"
+cloudflare_api_token = "your-cloudflare-api-token"
+vercel_api_token     = "your-vercel-api-token"
+vercel_team_id       = ""  # Leave empty for personal account
+vercel_project_name  = "savedtube"
+github_repo          = "your-org/savedtube"
+
+# Supabase (sensitive — use env vars in CI if preferred)
+supabase_access_token     = "your-supabase-access-token"
+supabase_project_id       = "your-project-ref"
+supabase_url              = "https://your-project.supabase.co"
+supabase_anon_key         = "your-anon-key"
+supabase_service_role_key = "your-service-role-key"
+
+# Google OAuth (managed in Vercel; included for reference)
+google_client_id     = "your-google-client-id"
+google_client_secret = "your-google-client-secret"
+nextauth_secret      = "generate-with-openssl-rand-base64-32"

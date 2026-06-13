@@ -1,91 +1,65 @@
-# YouTube Playlist Sync - Implementation Complete ✅
+# YouTube Playlist Sync — Current State
 
-## Architecture Overview
+**Last updated:** June 2026
 
-**Server-side API routes** call YouTube Data API using NextAuth JWT tokens (not Supabase tokens for simplicity).
+## Architecture
 
-**Database**: Supabase with `playlist_progress` table for tracking watched videos.
+- **Auth**: NextAuth.js with Google OAuth and automatic token refresh
+- **YouTube API**: Server-side calls in API routes using the session access token
+- **Database**: Supabase Postgres with app-level `user_id` filtering (service role key on server)
+- **User IDs**: TEXT (NextAuth `sub`), not Supabase Auth UUIDs
 
-**Token Management**: Automatic refresh handled by NextAuth JWT callbacks.
+## API Endpoints
 
-## Implemented API Endpoints
+### GET /api/playlists
 
-### ✅ GET /api/playlists
-- Fetches user's YouTube playlists using `mine=true`
-- Supports search query parameter
-- Handles pagination with `nextPageToken`
-- Returns: `{ playlists: [], nextPageToken, pageInfo }`
+Fetches the signed-in user's YouTube playlists (`mine=true`). Supports `q` (search) and `pageToken`.
 
-### ✅ GET /api/playlist-items?playlistId=...
-- Fetches videos from specific playlist
-- Supports pagination
-- Returns: `{ items: [], nextPageToken, pageInfo }`
+### GET /api/playlist-items?playlistId=...&sort=...
 
-### ✅ POST /api/progress
-- Saves/updates video watched status
-- Body: `{ playlistId, videoId, watched }`
-- Uses Supabase upsert with unique constraint
+Fetches playlist videos merged with per-user edits from `playlist_item_edits`. Sort modes: `custom`, `date_desc`, `date_asc`, `alpha_asc`, `alpha_desc`.
 
-### ✅ GET /api/progress?playlistId=...
-- Retrieves watched status for all videos in playlist
-- Returns: `{ progress: [] }`
+### POST /api/playlist-items
 
-## Frontend Implementation
+Playlist edit actions: `remove`, `reorder`, `add` (by YouTube URL).
 
-### ✅ Dashboard (/dashboard)
-- **Search bar** for filtering playlists
-- **Grid layout** showing playlist thumbnails, titles, video counts
-- **Responsive design** with loading states
-- **Error handling** for failed API calls
+### GET/POST /api/progress
 
-### ✅ Playlist Detail (/p/[playlistId])
-- **Video list** with thumbnails and metadata
-- **Watch status toggle** (✓ watched/unwatched)
-- **Progress tracking** with visual indicators
-- **Watch button** linking to video player
-- **Back navigation** to dashboard
+Read and update watched/unwatched status per video.
 
-### 🔄 Video Player (/watch/[videoId]?playlistId=...)
-- **TODO**: Full-bleed YouTube player
-- **TODO**: Previous/Next navigation
-- **TODO**: Small queue sidebar
-- **TODO**: Auto-mark as watched
+### GET/POST /api/hidden-playlists
 
-## Database Schema
+Read hidden playlist IDs and toggle visibility.
 
-```sql
-CREATE TABLE playlist_progress (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    playlist_id TEXT NOT NULL,
-    video_id TEXT NOT NULL,
-    watched BOOLEAN DEFAULT false,
-    watched_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(user_id, playlist_id, video_id)
-);
-```
+### GET/POST/PATCH/DELETE /api/vid-intervals
 
-## Security Features
+CRUD for practice intervals on a video.
 
-- **Row Level Security (RLS)** enabled on all tables
-- **User isolation**: Users can only access their own progress
-- **Server-side only**: Tokens never exposed to client
-- **Automatic token refresh**: Handled by NextAuth
+### POST /api/vid-intervals/import
 
-## Next Steps
+Import intervals from YouTube chapter data.
 
-1. **Video Player Implementation** - Full-bleed YouTube embed with navigation
-2. **Pagination UI** - Load more buttons or infinite scroll
-3. **Search Improvements** - Debounced search, filters
-4. **Progress Analytics** - Watch time tracking, completion stats
-5. **Playlist Management** - Create, edit, delete playlists
+## Frontend Pages
 
-## Testing Status
+| Route | Status |
+|-------|--------|
+| `/dashboard` | Playlist browser with search and hide/show |
+| `/p/[playlistId]` | Video list, progress toggles, sorting, editing |
+| `/watch/[videoId]` | YouTube player, interval manager, loop playback, prev/next navigation |
 
-- ✅ **API Routes**: All endpoints tested and working
-- ✅ **Authentication**: NextAuth integration complete
-- ✅ **Database**: Supabase connection and RLS working
-- ✅ **Frontend**: Dashboard and playlist detail pages functional
-- 🔄 **Video Player**: Ready for implementation
+## Database Tables
+
+- `playlist_progress` — watched status
+- `hidden_playlists` — dashboard visibility preferences
+- `playlist_item_edits` — reorder, soft-remove, manual additions
+- `video_intervals` — practice loop start/end times with optional names
+
+RLS is disabled on these tables; authorization is enforced in API routes via NextAuth session checks.
+
+## Server Actions (partial)
+
+`src/lib/actions.ts` provides server-action alternatives for progress and hidden-playlist mutations. The dashboard and playlist pages still use API routes via `fetch`.
+
+## Shared module note
+
+`src/lib/youtube-server.ts` duplicates YouTube fetch logic but is not yet used by the API routes.

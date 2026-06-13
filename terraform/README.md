@@ -1,116 +1,110 @@
 # SavedTube Infrastructure
 
-This directory contains Terraform configurations to manage the infrastructure for SavedTube, including Cloudflare DNS, email forwarding, and other services.
+Terraform configurations for Cloudflare DNS, email forwarding, Vercel custom domain, and Supabase project references.
 
 ## Prerequisites
 
-1. **Terraform**: Install Terraform (>= 1.0) from [terraform.io](https://terraform.io)
-2. **Cloudflare Account**: You need a Cloudflare account with a domain
-3. **Cloudflare API Token**: Generate an API token with appropriate permissions
+1. **Terraform** >= 1.0 — [terraform.io](https://terraform.io)
+2. **Cloudflare account** with the domain added
+3. **Cloudflare API token** with Zone read, DNS edit, and Email Routing permissions
+4. **Vercel API token** — [vercel.com/account/tokens](https://vercel.com/account/tokens)
+5. **Supabase access token** — [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens)
 
 ## Setup
 
-### 1. Get Cloudflare API Token
-
-1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/profile/api-tokens)
-2. Click "Create Token"
-3. Use "Custom token" template
-4. Set permissions:
-   - `Zone:Zone:Read`
-   - `Zone:DNS:Edit`
-   - `Zone:Page Rules:Edit`
-   - `Zone:Email Routing:Edit`
-5. Set zone resources to include your domain
-6. Copy the generated token
-
-### 2. Configure Variables
-
-1. Copy the example variables file:
-   ```bash
-   cp terraform.tfvars.example terraform.tfvars
-   ```
-
-2. Edit `terraform.tfvars` with your values:
-   ```hcl
-   domain_name = "yourdomain.com"
-   app_url = "your-app.vercel.app"
-   support_email = "your-support@gmail.com"
-   contact_email = "your-contact@gmail.com"
-   cloudflare_api_token = "your-api-token"
-   ```
-
-### 3. Initialize and Deploy
+### 1. Configure variables
 
 ```bash
-# Initialize Terraform
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Edit `terraform.tfvars` with your values. Never commit `terraform.tfvars`.
+
+### 2. Initialize and deploy
+
+```bash
 terraform init
-
-# Review the planned changes
 terraform plan
-
-# Apply the configuration
 terraform apply
 ```
 
-## What This Creates
+Or use the Makefile:
 
-### DNS Records
-- `@` (root domain) → Your app URL
-- `www` → Your app URL  
-- `api` → Your app URL
+```bash
+make init
+make plan
+make apply
+```
 
-### Email Forwarding
-- `support@yourdomain.com` → Your support email
-- `contact@yourdomain.com` → Your contact email
-- `hello@yourdomain.com` → Your contact email
+## What this manages
 
-### Page Rules
-- Static assets caching (1 year TTL)
-- Security headers and SSL enforcement
+### DNS (`modules/dns`)
+
+- Root (`@`) and `www` A records (proxied through Cloudflare)
+- `api` CNAME pointing to the app URL
+
+Page Rules are currently **disabled** in the DNS module due to a Cloudflare provider issue.
+
+### Email routing (`modules/email_routing`)
+
+Forwards these addresses to your personal inbox:
+
+- `support@yourdomain.com`
+- `contact@yourdomain.com`
+- `hello@yourdomain.com`
+
+Email routing requires a Cloudflare plan that supports it.
+
+### Vercel (`modules/vercel`)
+
+- References an existing Vercel project
+- Attaches the custom domain
+
+Environment variables are managed directly in the Vercel dashboard, not via Terraform.
+
+### Supabase (`modules/supabase`)
+
+- References an existing Supabase project
+- Exports project and API URLs
+
+## Variables
+
+See `variables.tf` for the full list. Key inputs:
+
+| Variable | Description |
+|----------|-------------|
+| `domain_name` | Your domain (e.g. `savedtube.com`) |
+| `app_url` | Vercel app hostname for the `api` CNAME |
+| `support_email` | Inbox for support forwards |
+| `contact_email` | Inbox for contact/hello forwards |
+| `cloudflare_api_token` | Cloudflare API token |
+| `vercel_api_token` | Vercel API token |
+| `vercel_project_name` | Existing Vercel project name |
+| `github_repo` | Repository in `owner/repo` format |
+| `supabase_project_id` | Supabase project reference ID |
+
+Sensitive values (tokens, keys) can also be passed via environment variables in CI.
 
 ## Commands
 
 ```bash
-# Plan changes
-terraform plan
-
-# Apply changes
-terraform apply
-
-# Destroy infrastructure (be careful!)
-terraform destroy
-
-# Show current state
-terraform show
-
-# List resources
-terraform state list
-```
-
-## Environment Variables
-
-You can also set the Cloudflare API token as an environment variable:
-
-```bash
-export CLOUDFLARE_API_TOKEN="your-api-token"
+terraform plan          # Preview changes
+terraform apply         # Apply changes
+terraform destroy       # Remove managed resources (careful!)
+terraform output        # Show outputs
+make fmt                # Format .tf files
+make validate           # Validate configuration
 ```
 
 ## Troubleshooting
 
-### Common Issues
+1. **API token permissions** — verify Cloudflare token scopes match what the modules need.
+2. **Domain not in Cloudflare** — add the domain before running `terraform apply`.
+3. **Email routing** — confirm your Cloudflare plan supports Email Routing.
+4. **Debug logs** — `TF_LOG=DEBUG terraform apply`
 
-1. **API Token Permissions**: Ensure your token has the required permissions
-2. **Domain Not in Cloudflare**: Make sure your domain is added to Cloudflare first
-3. **Email Routing**: Email routing requires a paid Cloudflare plan
+## Security notes
 
-### Getting Help
-
-- Check Terraform logs: `TF_LOG=DEBUG terraform apply`
-- Verify Cloudflare API token: `curl -X GET "https://api.cloudflare.com/client/v4/user/tokens/verify" -H "Authorization: Bearer YOUR_TOKEN"`
-
-## Security Notes
-
-- Never commit `terraform.tfvars` to version control
-- Use environment variables for sensitive data in CI/CD
-- Regularly rotate API tokens
-- Use least-privilege access for API tokens
+- Never commit `terraform.tfvars` or state files with secrets.
+- Use least-privilege API tokens.
+- Rotate tokens regularly.
