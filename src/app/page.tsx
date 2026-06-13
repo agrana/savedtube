@@ -112,7 +112,7 @@ export default function Home() {
       <section className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 px-5 pb-24 pt-14 sm:px-8 lg:grid-cols-[1fr_0.86fr] lg:pb-32 lg:pt-24">
         <div className="max-w-3xl">
           <div className="mb-7 inline-flex rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs font-medium uppercase tracking-[0.28em] text-amber-100/80">
-            Berlin minimalist studio
+            YouTube practice loops
           </div>
           <h1 className="max-w-4xl text-5xl font-medium leading-[0.95] tracking-[-0.055em] text-stone-50 sm:text-6xl lg:text-7xl">
             Master YouTube videos section by section.

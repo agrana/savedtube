@@ -17,19 +17,27 @@ CREATE POLICY "users_can_update_own_progress" ON public.playlist_progress
 CREATE POLICY "users_can_delete_own_progress" ON public.playlist_progress
     FOR DELETE USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
 
--- Re-enable RLS on hidden_playlists table
-ALTER TABLE public.hidden_playlists ENABLE ROW LEVEL SECURITY;
+-- hidden_playlists is created by a later historical migration in this repo.
+-- Keep this migration valid for fresh databases by applying the hidden_playlists
+-- RLS changes only when the table already exists.
+DO $$
+BEGIN
+    IF to_regclass('public.hidden_playlists') IS NOT NULL THEN
+        ALTER TABLE public.hidden_playlists ENABLE ROW LEVEL SECURITY;
 
--- Create RLS policies for hidden_playlists
-CREATE POLICY "users_can_view_own_hidden_playlists" ON public.hidden_playlists
-    FOR SELECT USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
+        CREATE POLICY "users_can_view_own_hidden_playlists" ON public.hidden_playlists
+            FOR SELECT USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
 
-CREATE POLICY "users_can_insert_own_hidden_playlists" ON public.hidden_playlists
-    FOR INSERT WITH CHECK (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
+        CREATE POLICY "users_can_insert_own_hidden_playlists" ON public.hidden_playlists
+            FOR INSERT WITH CHECK (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
 
-CREATE POLICY "users_can_delete_own_hidden_playlists" ON public.hidden_playlists
-    FOR DELETE USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
+        CREATE POLICY "users_can_delete_own_hidden_playlists" ON public.hidden_playlists
+            FOR DELETE USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
+
+        COMMENT ON TABLE public.hidden_playlists IS 'User playlist visibility preferences with RLS enabled. Authorization handled via NextAuth JWT claims.';
+    END IF;
+END;
+$$;
 
 -- Add comment explaining the security approach
 COMMENT ON TABLE public.playlist_progress IS 'User progress tracking with RLS enabled. Authorization handled via NextAuth JWT claims.';
-COMMENT ON TABLE public.hidden_playlists IS 'User playlist visibility preferences with RLS enabled. Authorization handled via NextAuth JWT claims.';
