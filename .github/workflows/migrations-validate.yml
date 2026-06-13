@@ -34,17 +34,6 @@ jobs:
       - name: Reset local DB and apply migrations
         run: supabase db reset
 
-      - name: Dump schema snapshot
-        run: |
-          mkdir -p db
-          supabase db dump --local --schema-only > db/schema.sql
-
-      - name: Upload schema snapshot
-        uses: actions/upload-artifact@v4
-        with:
-          name: schema-snapshot
-          path: db/schema.sql
-
       - name: Stop local Supabase
         if: always()
         run: supabase stop --no-backup
