@@ -190,6 +190,7 @@ export async function POST(request: NextRequest) {
       id: item.id,
       userId: item.user_id,
       videoId: item.video_id,
+      name: item.name ?? null,
       startTime: item.start_time,
       endTime: item.end_time,
       orderIndex: item.order_index,

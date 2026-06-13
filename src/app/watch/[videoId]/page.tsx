@@ -125,6 +125,25 @@ export default function WatchPage() {
     }
   };
 
+  const handleRenameInterval = async (intervalId: string, name: string) => {
+    try {
+      const response = await fetch('/api/vid-intervals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: intervalId, name }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to rename interval');
+      }
+
+      await fetchIntervals();
+    } catch (error) {
+      console.error('Error renaming interval:', error);
+      throw error;
+    }
+  };
+
   const handleImportFromYouTube = async (overwrite: boolean) => {
     setIsImportingIntervals(true);
     setImportError(null);
@@ -493,6 +512,7 @@ export default function WatchPage() {
         currentTime={currentTime}
         onAddInterval={handleAddInterval}
         onDeleteInterval={handleDeleteInterval}
+        onRenameInterval={handleRenameInterval}
         onToggleLoop={setLoopEnabled}
         onImportFromYouTube={handleImportFromYouTube}
         isImporting={isImportingIntervals}

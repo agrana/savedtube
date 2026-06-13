@@ -11,6 +11,35 @@ const createIntervalSchema = z.object({
   endTime: z.number().min(0),
 });
 
+const updateIntervalSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().max(100).nullable(),
+});
+
+type VideoIntervalRow = {
+  id: string;
+  user_id: string;
+  video_id: string;
+  name?: string | null;
+  start_time: number;
+  end_time: number;
+  order_index: number;
+  created_at: string;
+  updated_at: string;
+};
+
+const mapInterval = (item: VideoIntervalRow) => ({
+  id: item.id,
+  userId: item.user_id,
+  videoId: item.video_id,
+  name: item.name ?? null,
+  startTime: item.start_time,
+  endTime: item.end_time,
+  orderIndex: item.order_index,
+  createdAt: item.created_at,
+  updatedAt: item.updated_at,
+});
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -47,16 +76,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Map database fields to frontend model
-    const intervals = (data || []).map((item) => ({
-      id: item.id,
-      userId: item.user_id,
-      videoId: item.video_id,
-      startTime: item.start_time,
-      endTime: item.end_time,
-      orderIndex: item.order_index,
-      createdAt: item.created_at,
-      updatedAt: item.updated_at,
-    }));
+    const intervals = (data || []).map(mapInterval);
 
     return NextResponse.json({ intervals });
   } catch (error) {
@@ -132,20 +152,58 @@ export async function POST(request: NextRequest) {
     }
 
     // Map to frontend model
-    const interval = {
-      id: data.id,
-      userId: data.user_id,
-      videoId: data.video_id,
-      startTime: data.start_time,
-      endTime: data.end_time,
-      orderIndex: data.order_index,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-    };
+    const interval = mapInterval(data);
 
     return NextResponse.json({ interval }, { status: 201 });
   } catch (error) {
     console.error('Error in POST /api/vid-intervals:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const validation = updateIntervalSchema.safeParse(body);
+
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Invalid input', details: validation.error.format() },
+        { status: 400 }
+      );
+    }
+
+    const { id, name } = validation.data;
+    const supabase = createServerSupabaseClient();
+
+    const { data, error } = await supabase
+      .from('video_intervals')
+      .update({ name: name?.trim() || null })
+      .eq('id', id)
+      .eq('user_id', session.user.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating interval:', error);
+      return NextResponse.json(
+        { error: 'Failed to update interval' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ interval: mapInterval(data) });
+  } catch (error) {
+    console.error('Error in PATCH /api/vid-intervals:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

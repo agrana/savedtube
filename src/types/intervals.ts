@@ -2,6 +2,7 @@ export interface VideoInterval {
   id: string;
   userId: string;
   videoId: string;
+  name?: string | null;
   startTime: number;
   endTime: number;
   orderIndex: number;
