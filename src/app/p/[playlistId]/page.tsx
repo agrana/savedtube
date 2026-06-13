@@ -181,7 +181,10 @@ export default function PlaylistPage() {
 
     const previousItems = items;
     const reordered = [...items];
-    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    [reordered[index], reordered[target]] = [
+      reordered[target],
+      reordered[index],
+    ];
     setItems(reordered);
     setIsApplyingEdit(true);
 
@@ -284,21 +287,23 @@ export default function PlaylistPage() {
 
   if (status === 'loading' || isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-[#080806] text-stone-100 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-24 w-24 border-b-2 border-amber-200"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-900 mb-4">Error</h1>
-          <p className="text-red-600 mb-4">{error}</p>
+      <div className="min-h-screen bg-[#080806] text-stone-100 flex items-center justify-center px-5">
+        <div className="rounded-[2rem] border border-red-300/20 bg-[#10100d]/90 p-8 text-center shadow-2xl shadow-black/50">
+          <h1 className="text-2xl font-medium tracking-[-0.03em] text-red-100 mb-4">
+            Error
+          </h1>
+          <p className="text-red-200/80 mb-5">{error}</p>
           <Link
             href="/dashboard"
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="rounded-full bg-stone-100 px-5 py-2.5 text-sm font-medium text-stone-950 transition hover:bg-white"
           >
             Back to Dashboard
           </Link>
@@ -308,236 +313,253 @@ export default function PlaylistPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Link
-                href="/dashboard"
-                className="text-gray-500 hover:text-gray-700 mr-4"
-              >
-                ← Back to Playlists
-              </Link>
-              <Logo size="lg" variant="default" showText={true} />
-              <span className="text-lg font-medium text-gray-600 ml-4">
-                Playlist
-              </span>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                {session?.user?.image && (
-                  <Image
-                    className="h-8 w-8 rounded-full"
-                    src={session.user.image}
-                    alt={session.user.name || 'User'}
-                    width={32}
-                    height={32}
-                  />
-                )}
-                <span className="text-sm font-medium text-gray-700">
-                  {session?.user?.name}
-                </span>
-              </div>
-            </div>
+    <div className="relative min-h-screen overflow-hidden bg-[#080806] text-stone-100">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.16),transparent_42%),linear-gradient(180deg,rgba(255,255,255,0.045),transparent_55%)]" />
+      <div className="pointer-events-none absolute left-1/2 top-20 h-[1px] w-[78vw] -translate-x-1/2 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+
+      <nav className="relative z-10 border-b border-white/[0.06] bg-[#080806]/70 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/dashboard"
+              className="hidden rounded-full border border-white/10 bg-white/[0.03] px-3 py-2 text-sm font-medium text-stone-300 transition hover:bg-white/[0.06] hover:text-stone-50 sm:inline-flex"
+            >
+              ← Playlists
+            </Link>
+            <Logo size="lg" variant="white" showText={true} />
+            <span className="hidden rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs font-medium uppercase tracking-[0.24em] text-amber-100/80 lg:inline-flex">
+              Playlist
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            {session?.user?.image && (
+              <Image
+                className="h-8 w-8 rounded-full border border-white/10"
+                src={session.user.image}
+                alt={session.user.name || 'User'}
+                width={32}
+                height={32}
+              />
+            )}
+            <span className="hidden max-w-36 truncate text-sm font-medium text-stone-300 sm:inline">
+              {session?.user?.name}
+            </span>
           </div>
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="bg-white rounded-lg shadow-md p-4 mb-6 space-y-4">
-            <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2">
-                <label
-                  htmlFor="sort-mode"
-                  className="text-sm font-medium text-gray-700"
-                >
-                  Sort
-                </label>
-                <select
-                  id="sort-mode"
-                  value={sortMode}
-                  onChange={(event) => setSortMode(event.target.value as SortMode)}
-                  className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900"
-                >
-                  <option value="custom">Custom order</option>
-                  <option value="date_desc">Date (newest first)</option>
-                  <option value="date_asc">Date (oldest first)</option>
-                  <option value="alpha_asc">Alphabetical (A-Z)</option>
-                  <option value="alpha_desc">Alphabetical (Z-A)</option>
-                </select>
-              </div>
-              <p className="text-xs text-gray-500">
-                Total videos shown: {items.length}
-              </p>
-            </div>
+      <main className="relative z-10 mx-auto max-w-7xl px-5 py-10 sm:px-8 lg:py-14">
+        <section className="mb-9 max-w-3xl">
+          <p className="font-mono text-xs uppercase tracking-[0.28em] text-amber-100/70">
+            Playlist practice room
+          </p>
+          <h1 className="mt-4 text-4xl font-medium leading-[0.95] tracking-[-0.055em] text-stone-50 sm:text-5xl">
+            Arrange the lesson path before you start looping.
+          </h1>
+          <p className="mt-5 max-w-2xl text-lg leading-8 text-stone-400">
+            Sort, add, remove, and open videos without leaving the warm studio
+            language from the landing page.
+          </p>
+        </section>
 
-            <form onSubmit={addVideoByUrl} className="flex flex-col sm:flex-row gap-2">
-              <input
-                type="url"
-                value={videoUrl}
-                onChange={(event) => setVideoUrl(event.target.value)}
-                placeholder="Add video by YouTube URL"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"
-                required
-              />
-              <button
-                type="submit"
-                disabled={isApplyingEdit}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+        <div className="mb-8 space-y-4 rounded-[1.5rem] border border-white/10 bg-[#10100d]/90 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur sm:p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <label
+                htmlFor="sort-mode"
+                className="text-sm font-medium text-stone-300"
               >
-                Add video
-              </button>
-            </form>
-
-            {editError && (
-              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
-                {editError}
-              </div>
-            )}
-
-            {editMessage && (
-              <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">
-                {editMessage}
-              </div>
-            )}
+                Sort
+              </label>
+              <select
+                id="sort-mode"
+                value={sortMode}
+                onChange={(event) =>
+                  setSortMode(event.target.value as SortMode)
+                }
+                className="rounded-full border border-white/10 bg-white/[0.035] px-4 py-2 text-sm text-stone-100 outline-none transition focus:border-amber-200/40 focus:bg-white/[0.055]"
+              >
+                <option value="custom">Custom order</option>
+                <option value="date_desc">Date (newest first)</option>
+                <option value="date_asc">Date (oldest first)</option>
+                <option value="alpha_asc">Alphabetical (A-Z)</option>
+                <option value="alpha_desc">Alphabetical (Z-A)</option>
+              </select>
+            </div>
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-amber-100/60">
+              Total videos shown: {items.length}
+            </p>
           </div>
 
-          {items.length > 0 ? (
-            <div className="space-y-4">
-              {items.map((item, index) => {
-                const videoId = item.contentDetails.videoId;
-                const watched =
-                  progress.find((p) => p.video_id === videoId)?.watched || false;
+          <form
+            onSubmit={addVideoByUrl}
+            className="flex flex-col gap-3 sm:flex-row"
+          >
+            <input
+              type="url"
+              value={videoUrl}
+              onChange={(event) => setVideoUrl(event.target.value)}
+              placeholder="Add video by YouTube URL"
+              className="flex-1 rounded-full border border-white/10 bg-white/[0.035] px-5 py-3 text-sm text-stone-100 placeholder:text-stone-500 outline-none transition focus:border-amber-200/40 focus:bg-white/[0.055]"
+              required
+            />
+            <button
+              type="submit"
+              disabled={isApplyingEdit}
+              className="rounded-full bg-stone-100 px-6 py-3 text-sm font-medium text-stone-950 transition hover:bg-white disabled:cursor-wait disabled:opacity-60"
+            >
+              Add video
+            </button>
+          </form>
 
-                return (
-                  <div
-                    key={item.id}
-                    className={`bg-white rounded-lg shadow-md p-4 flex items-center space-x-4 ${
-                      watched ? 'opacity-75' : ''
-                    }`}
-                  >
-                    <div className="flex-shrink-0">
-                      <div className="relative w-32 h-20">
-                        <Image
-                          src={
-                            item.snippet.thumbnails?.medium?.url ||
-                            item.snippet.thumbnails?.default?.url ||
-                            'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIwIiBoZWlnaHQ9IjE4MCIgdmlld0JveD0iMCAwIDMyMCAxODAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMjAiIGhlaWdodD0iMTgwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xNjAgOTBDMTQzLjQzMSA5MCAxMzAgMTAzLjQzMSAxMzAgMTIwQzEzMCAxMzYuNTY5IDE0My40MzEgMTUwIDE2MCAxNTBDMTc2LjU2OSAxNTAgMTkwIDEzNi41NjkgMTkwIDEyMEMxOTAgMTAzLjQzMSAxNzYuNTY5IDkwIDE2MCA5MFoiIGZpbGw9IiM5Q0EzQUYiLz4KPHBhdGggZD0iTTE0MCAxMzBMMTcwIDEyMEwxNDAgMTEwVjEzMFoiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPgo='
-                          }
-                          alt={item.snippet.title}
-                          fill
-                          className="object-cover rounded"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-medium text-gray-900 truncate">
-                        {item.snippet.title}
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        {item.snippet.channelTitle || 'Unknown Channel'}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {item.snippet.publishedAt
-                          ? new Date(item.snippet.publishedAt).toLocaleDateString()
-                          : 'Unknown Date'}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      {sortMode === 'custom' && (
-                        <>
-                          <button
-                            onClick={() => moveItem(index, -1)}
-                            disabled={index === 0 || isApplyingEdit}
-                            className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40"
-                            title="Move up"
-                          >
-                            ↑
-                          </button>
-                          <button
-                            onClick={() => moveItem(index, 1)}
-                            disabled={index === items.length - 1 || isApplyingEdit}
-                            className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40"
-                            title="Move down"
-                          >
-                            ↓
-                          </button>
-                        </>
-                      )}
-
-                      <button
-                        onClick={() => toggleWatched(videoId, watched)}
-                        className={`p-2 rounded-full ${
-                          watched
-                            ? 'bg-green-100 text-green-600 hover:bg-green-200'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                        title={watched ? 'Mark as unwatched' : 'Mark as watched'}
-                      >
-                        {watched ? (
-                          <svg
-                            className="w-5 h-5"
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        ) : (
-                          <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                        )}
-                      </button>
-
-                      <button
-                        onClick={() => removeVideo(videoId)}
-                        disabled={isApplyingEdit}
-                        className="px-3 py-2 text-sm rounded-md bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50"
-                        title="Remove from this playlist view"
-                      >
-                        Remove
-                      </button>
-
-                      <Link
-                        href={`/watch/${videoId}?playlistId=${playlistId}`}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                      >
-                        Watch
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })}
+          {editError && (
+            <div className="rounded-2xl border border-red-300/20 bg-red-300/10 px-4 py-3 text-sm text-red-100">
+              {editError}
             </div>
-          ) : (
-            <div className="text-center py-12">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No videos found
-              </h3>
-              <p className="text-gray-600">
-                This playlist appears to be empty or all items were removed.
-              </p>
+          )}
+
+          {editMessage && (
+            <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-sm text-emerald-100">
+              {editMessage}
             </div>
           )}
         </div>
+
+        {items.length > 0 ? (
+          <div className="space-y-4">
+            {items.map((item, index) => {
+              const videoId = item.contentDetails.videoId;
+              const watched =
+                progress.find((p) => p.video_id === videoId)?.watched || false;
+
+              return (
+                <div
+                  key={item.id}
+                  className={`grid gap-4 rounded-[1.5rem] border border-white/10 bg-[#10100d]/90 p-4 shadow-2xl shadow-black/20 transition duration-200 hover:border-amber-200/25 sm:grid-cols-[8rem_1fr_auto] sm:items-center ${
+                    watched ? 'opacity-60' : ''
+                  }`}
+                >
+                  <div className="relative aspect-video overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#151512,#0a0a08)] sm:h-20 sm:w-32">
+                    <Image
+                      src={
+                        item.snippet.thumbnails?.medium?.url ||
+                        item.snippet.thumbnails?.default?.url ||
+                        'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIwIiBoZWlnaHQ9IjE4MCIgdmlld0JveD0iMCAwIDMyMCAxODAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZyI+CjxyZWN0IHdpZHRoPSIzMjAiIGhlaWdodD0iMTgwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xNjAgOTBDMTQzLjQzMSA5MCAxMzAgMTAzLjQzMSAxMzAgMTIwQzEzMCAxMzYuNTY5IDE0My40MzEgMTUwIDE2MCAxNTBDMTc2LjU2OSAxNTAgMTkwIDEzNi41NjkgMTkwIDEyMEMxOTAgMTAzLjQzMSAxNzYuNTY5IDkwIDE2MCA5MFoiIGZpbGw9IiM5Q0EzQUYiLz4KPHBhdGggZD0iTTE0MCAxMzBMMTcwIDEyMEwxNDAgMTEwVjEzMFoiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPgo='
+                      }
+                      alt={item.snippet.title}
+                      fill
+                      className="object-cover opacity-85"
+                    />
+                  </div>
+
+                  <div className="min-w-0">
+                    <h3 className="truncate text-lg font-medium tracking-[-0.02em] text-stone-100">
+                      {item.snippet.title}
+                    </h3>
+                    <p className="mt-1 text-sm text-stone-400">
+                      {item.snippet.channelTitle || 'Unknown Channel'}
+                    </p>
+                    <p className="mt-2 font-mono text-xs uppercase tracking-[0.18em] text-stone-500">
+                      {item.snippet.publishedAt
+                        ? new Date(
+                            item.snippet.publishedAt
+                          ).toLocaleDateString()
+                        : 'Unknown Date'}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                    {sortMode === 'custom' && (
+                      <>
+                        <button
+                          onClick={() => moveItem(index, -1)}
+                          disabled={index === 0 || isApplyingEdit}
+                          className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-2 text-stone-300 transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
+                          title="Move up"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          onClick={() => moveItem(index, 1)}
+                          disabled={
+                            index === items.length - 1 || isApplyingEdit
+                          }
+                          className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-2 text-stone-300 transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
+                          title="Move down"
+                        >
+                          ↓
+                        </button>
+                      </>
+                    )}
+
+                    <button
+                      onClick={() => toggleWatched(videoId, watched)}
+                      className={`rounded-full border px-3 py-2 transition ${
+                        watched
+                          ? 'border-emerald-200/25 bg-emerald-300/10 text-emerald-100 hover:bg-emerald-300/15'
+                          : 'border-white/10 bg-white/[0.035] text-stone-300 hover:bg-white/[0.06]'
+                      }`}
+                      title={watched ? 'Mark as unwatched' : 'Mark as watched'}
+                    >
+                      {watched ? (
+                        <svg
+                          className="w-5 h-5"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      ) : (
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => removeVideo(videoId)}
+                      disabled={isApplyingEdit}
+                      className="rounded-full border border-red-300/20 bg-red-300/10 px-4 py-2 text-sm font-medium text-red-100 transition hover:bg-red-300/15 disabled:opacity-50"
+                      title="Remove from this playlist view"
+                    >
+                      Remove
+                    </button>
+
+                    <Link
+                      href={`/watch/${videoId}?playlistId=${playlistId}`}
+                      className="rounded-full bg-stone-100 px-5 py-2 text-sm font-medium text-stone-950 transition hover:bg-white"
+                    >
+                      Watch
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-[1.5rem] border border-white/10 bg-[#10100d]/90 px-6 py-14 text-center">
+            <h3 className="text-lg font-medium text-stone-100 mb-2">
+              No videos found
+            </h3>
+            <p className="text-stone-400">
+              This playlist appears to be empty or all items were removed.
+            </p>
+          </div>
+        )}
       </main>
     </div>
   );
