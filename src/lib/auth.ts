@@ -57,8 +57,7 @@ export const authOptions = {
         params: {
           scope:
             'openid email profile https://www.googleapis.com/auth/youtube.readonly',
-          access_type: 'offline', // Enable refresh tokens
-          prompt: 'consent select_account', // Ensure refresh token issuance
+          access_type: 'offline', // Enable refresh tokens without forcing the Google consent screen every sign-in
           include_granted_scopes: 'true',
         },
       },
