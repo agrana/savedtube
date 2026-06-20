@@ -27,20 +27,7 @@ export default function Logo({
     xl: 'text-3xl',
   };
 
-  // Determine which logo to use based on variant
-  const getLogoSource = () => {
-    switch (variant) {
-      case 'light':
-        return '/savedtube-logo-light.svg';
-      case 'dark':
-        return '/savedtube-logo-dark.svg';
-      case 'white':
-        return '/savedtube-logo-dark.svg'; // Use dark logo for white variant
-      default:
-        // For default, we'll use CSS to switch based on theme
-        return '/savedtube-logo-light.svg';
-    }
-  };
+  const logoSource = '/savedtube-logo-mystic-256.png';
 
   // Theme-aware color classes for text
   const getTextColor = () => {
@@ -56,41 +43,20 @@ export default function Logo({
     }
   };
 
-  const logoSource = getLogoSource();
   const textColor = getTextColor();
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       {/* Logo Icon */}
       <div className={`${sizeClasses[size]} flex-shrink-0 relative`}>
-        {variant === 'default' ? (
-          // For default variant, show both logos and use CSS to switch
-          <div className="relative">
-            <Image
-              src="/savedtube-logo-light.svg"
-              alt="SavedTube Logo"
-              width={256}
-              height={256}
-              className={`w-full h-full dark:hidden`}
-            />
-            <Image
-              src="/savedtube-logo-dark.svg"
-              alt="SavedTube Logo"
-              width={256}
-              height={256}
-              className={`w-full h-full hidden dark:block`}
-            />
-          </div>
-        ) : (
-          // For specific variants, use the appropriate logo
-          <Image
-            src={logoSource}
-            alt="SavedTube Logo"
-            width={256}
-            height={256}
-            className="w-full h-full"
-          />
-        )}
+        <Image
+          src={logoSource}
+          alt="SavedTube Logo"
+          width={256}
+          height={256}
+          className="w-full h-full rounded-[22%] object-cover"
+          priority={size === 'lg' || size === 'xl'}
+        />
       </div>
 
       {/* Text Logo */}

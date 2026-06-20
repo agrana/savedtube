@@ -13,12 +13,13 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
+        url: '/savedtube-logo-mystic-256.png',
+        type: 'image/png',
+        sizes: '256x256',
       },
     ],
-    shortcut: '/icon.svg',
-    apple: '/icon.svg',
+    shortcut: '/savedtube-logo-mystic-256.png',
+    apple: '/apple-icon.png',
   },
 };
 
