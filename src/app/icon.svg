@@ -1,7 +1,0 @@
-<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Bookmark shape - more recognizable save icon -->
-  <path d="M8 2C8 1.44772 8.44772 1 9 1H23C23.5523 1 24 1.44772 24 2V26C24 26.5523 23.5523 27 23 27C22.4477 27 22 26.5523 22 26V2H9V26C9 26.5523 8.55228 27 8 27C7.44772 27 7 26.5523 7 26V2Z" fill="#374151"/>
-  
-  <!-- Play button triangle - adjusted position -->
-  <path d="M13 10L19 16L13 22V10Z" fill="#DC2626"/>
-</svg>
