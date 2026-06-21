@@ -102,6 +102,9 @@ export default function WatchPage() {
     time: number;
     token: number;
   } | null>(null);
+  const [playThrough, setPlayThrough] = useState<{ startIndex: number } | null>(
+    null
+  );
   const [isImportingIntervals, setIsImportingIntervals] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
@@ -312,6 +315,12 @@ export default function WatchPage() {
     }
   }, [playlistItems, videoId]);
 
+  // Reset play-through when the video changes so a stale interval index from a
+  // previous video can't constrain playback of the new one.
+  useEffect(() => {
+    setPlayThrough(null);
+  }, [videoId]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -488,6 +497,8 @@ export default function WatchPage() {
             seekToSeconds={seekRequest?.time ?? null}
             seekToToken={seekRequest?.token}
             onSeekComplete={() => setSeekRequest(null)}
+            playThroughIntervals={playThrough !== null}
+            playThroughStartIndex={playThrough?.startIndex ?? 0}
           />
         </div>
       </div>
@@ -582,15 +593,24 @@ export default function WatchPage() {
         onAddInterval={handleAddInterval}
         onDeleteInterval={handleDeleteInterval}
         onRenameInterval={handleRenameInterval}
-        onToggleLoop={setLoopEnabled}
+        onToggleLoop={(enabled) => {
+          // Toggling loop exits any active play-through so loop mode regains
+          // control of playback.
+          setPlayThrough(null);
+          setLoopEnabled(enabled);
+        }}
         onImportFromYouTube={handleImportFromYouTube}
         isImporting={isImportingIntervals}
         importError={importError}
         importMessage={importMessage}
         activeIntervalId={activeIntervalId}
-        onSelectInterval={(interval) =>
-          setSeekRequest({ time: interval.startTime, token: Date.now() })
-        }
+        onSelectInterval={(interval) => {
+          const startIndex = sortedIntervals.findIndex(
+            (item) => item.id === interval.id
+          );
+          setPlayThrough({ startIndex: startIndex >= 0 ? startIndex : 0 });
+          setSeekRequest({ time: interval.startTime, token: Date.now() });
+        }}
         isOpen={showIntervalPanel}
         onClose={() => setShowIntervalPanel(false)}
       />
