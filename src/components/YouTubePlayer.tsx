@@ -79,6 +79,8 @@ interface YouTubePlayerProps {
   seekToSeconds?: number | null;
   seekToToken?: number;
   onSeekComplete?: () => void;
+  playThroughIntervals?: boolean;
+  playThroughStartIndex?: number;
 }
 
 export function YouTubePlayer({
@@ -95,6 +97,8 @@ export function YouTubePlayer({
   seekToSeconds = null,
   seekToToken,
   onSeekComplete,
+  playThroughIntervals = false,
+  playThroughStartIndex = 0,
 }: YouTubePlayerProps) {
   const playerRef = useRef<YouTubePlayerInstance | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -110,6 +114,11 @@ export function YouTubePlayer({
   // Interval playback state
   const [currentIntervalIndex, setCurrentIntervalIndex] = useState(0);
   const intervalCheckRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Tracks the interval currently being played through after an explicit
+  // user click. Once it advances past the last interval the value equals the
+  // interval count, which signals that normal playback should resume.
+  const playThroughIndexRef = useRef(0);
 
   useEffect(() => {
     // Load YouTube IFrame API
@@ -205,8 +214,22 @@ export function YouTubePlayer({
 
     playerRef.current.seekTo(seekToSeconds, true);
     playerRef.current.playVideo();
+
+    // An explicit interval click seeks the player; start the play-through
+    // sequence from the clicked interval so subsequent intervals follow.
+    if (playThroughIntervals) {
+      playThroughIndexRef.current = playThroughStartIndex;
+    }
+
     onSeekComplete?.();
-  }, [isPlayerReady, seekToSeconds, seekToToken, onSeekComplete]);
+  }, [
+    isPlayerReady,
+    seekToSeconds,
+    seekToToken,
+    onSeekComplete,
+    playThroughIntervals,
+    playThroughStartIndex,
+  ]);
 
   // Current-time + interval playback monitoring
   useEffect(() => {
@@ -240,6 +263,57 @@ export function YouTubePlayer({
 
         // Only apply interval playback behavior when playing
         if (playerState !== window.YT.PlayerState.PLAYING) return;
+
+        // Play-through mode: the user explicitly clicked an interval. Play the
+        // current interval, then automatically advance to each subsequent
+        // interval in order. After the final interval finishes, stop
+        // constraining playback so the rest of the video plays normally.
+        if (playThroughIntervals) {
+          const activeIndex = playThroughIndexRef.current;
+
+          // Sequence already completed: let the video play to the end.
+          if (activeIndex >= sortedIntervals.length) return;
+
+          const activeInterval = sortedIntervals[activeIndex];
+
+          if (currentTime >= activeInterval.endTime) {
+            const nextIndex = activeIndex + 1;
+            if (nextIndex < sortedIntervals.length) {
+              playerRef.current.seekTo(
+                sortedIntervals[nextIndex].startTime,
+                true
+              );
+              playThroughIndexRef.current = nextIndex;
+              setCurrentIntervalIndex(nextIndex);
+              onIntervalChange?.(nextIndex);
+            } else {
+              // Past the final interval: resume normal playback.
+              playThroughIndexRef.current = sortedIntervals.length;
+            }
+          } else if (activeIndex !== currentIntervalIndex) {
+            setCurrentIntervalIndex(activeIndex);
+            onIntervalChange?.(activeIndex);
+          }
+          return;
+        }
+
+        // Without loop or play-through, leave playback untouched and only keep
+        // the active interval highlight in sync as the video plays.
+        if (!loopEnabled) {
+          const containingIndex = sortedIntervals.findIndex(
+            (interval) =>
+              currentTime >= interval.startTime &&
+              currentTime < interval.endTime
+          );
+          if (
+            containingIndex !== -1 &&
+            containingIndex !== currentIntervalIndex
+          ) {
+            setCurrentIntervalIndex(containingIndex);
+            onIntervalChange?.(containingIndex);
+          }
+          return;
+        }
 
         // Find which interval we should be in
         let targetIntervalIndex = -1;
@@ -312,6 +386,7 @@ export function YouTubePlayer({
     currentIntervalIndex,
     onIntervalChange,
     onCurrentTimeUpdate,
+    playThroughIntervals,
   ]);
 
   return (
