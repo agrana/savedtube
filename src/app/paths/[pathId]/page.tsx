@@ -7,13 +7,17 @@ import {
   useState,
   type FormEvent,
 } from 'react';
-import { useSession, signOut } from 'next-auth/react';
+import { useSession, signIn, signOut } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
 import PathMap from '@/components/PathMap';
 import QuizReviewPanel from '@/components/QuizReviewPanel';
+import {
+  isYouTubeReauthErrorCode,
+  YOUTUBE_REAUTH_REQUIRED_MESSAGE,
+} from '@/lib/api-auth-errors';
 import type { PathRecord } from '@/lib/paths';
 import type {
   PathJobPublicView,
@@ -101,6 +105,8 @@ export default function PathDetailPage() {
     Record<string, string>
   >({});
   const [researchBanner, setResearchBanner] = useState<string | null>(null);
+  const [needsYouTubeReconnect, setNeedsYouTubeReconnect] = useState(false);
+  const [isReconnectingYouTube, setIsReconnectingYouTube] = useState(false);
   const [queryResearchStatus, setQueryResearchStatus] = useState<string | null>(
     null
   );
@@ -172,9 +178,16 @@ export default function PathDetailPage() {
     }
     const params = new URLSearchParams(window.location.search);
     const researchError = params.get('researchError');
+    const researchErrorCode = params.get('researchErrorCode');
     const researchStatus = params.get('researchStatus');
     if (researchError) {
       setResearchBanner(researchError);
+    }
+    if (isYouTubeReauthErrorCode(researchErrorCode)) {
+      setNeedsYouTubeReconnect(true);
+      if (!researchError) {
+        setResearchBanner(YOUTUBE_REAUTH_REQUIRED_MESSAGE);
+      }
     }
     if (researchStatus) {
       setQueryResearchStatus(researchStatus);
@@ -232,6 +245,7 @@ export default function PathDetailPage() {
     }
     setIsResearching(true);
     setResearchBanner(null);
+    setNeedsYouTubeReconnect(false);
     setEditError(null);
 
     const key =
@@ -252,11 +266,20 @@ export default function PathDetailPage() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setResearchBanner(
-          data.error ||
-            researchFailureMessage(data.job || null) ||
-            'Research failed'
-        );
+        if (response.status === 401 && isYouTubeReauthErrorCode(data.code)) {
+          setNeedsYouTubeReconnect(true);
+          setResearchBanner(
+            typeof data.error === 'string' && data.error
+              ? data.error
+              : YOUTUBE_REAUTH_REQUIRED_MESSAGE
+          );
+        } else {
+          setResearchBanner(
+            data.error ||
+              researchFailureMessage(data.job || null) ||
+              'Research failed'
+          );
+        }
       } else if (data.job?.status === 'partial') {
         setResearchBanner(
           researchFailureMessage(data.job) ||
@@ -271,6 +294,23 @@ export default function PathDetailPage() {
       setResearchBanner('Research failed. Your saved path is still available.');
     } finally {
       setIsResearching(false);
+    }
+  };
+
+  const handleReconnectYouTube = async () => {
+    if (!pathId || isReconnectingYouTube) {
+      return;
+    }
+    setIsReconnectingYouTube(true);
+    const callbackUrl = `/paths/${pathId}`;
+    try {
+      // Explicit user action only — do not auto-redirect on mount (avoids loops).
+      await signOut({ redirect: false });
+      await signIn('google', { callbackUrl });
+    } catch (error) {
+      console.error('Error reconnecting Google YouTube auth:', error);
+      setResearchBanner(YOUTUBE_REAUTH_REQUIRED_MESSAGE);
+      setIsReconnectingYouTube(false);
     }
   };
 
@@ -581,7 +621,19 @@ export default function PathDetailPage() {
                   className="mt-5 rounded-[1.25rem] border border-amber-200/20 bg-amber-200/5 px-5 py-4 text-sm text-amber-50/90"
                   role="status"
                 >
-                  {failureFromJob}
+                  <p>{failureFromJob}</p>
+                  {needsYouTubeReconnect && (
+                    <button
+                      type="button"
+                      onClick={() => void handleReconnectYouTube()}
+                      disabled={isReconnectingYouTube}
+                      className="mt-3 inline-flex rounded-full bg-stone-100 px-4 py-2 text-sm font-medium text-stone-950 transition hover:bg-white disabled:opacity-60"
+                    >
+                      {isReconnectingYouTube
+                        ? 'Reconnecting...'
+                        : 'Reconnect Google YouTube'}
+                    </button>
+                  )}
                 </div>
               )}
 
