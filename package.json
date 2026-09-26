@@ -11,11 +11,11 @@
     "type-check": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "echo \"No tests specified yet\" && exit 0",
+    "test": "node --import ./scripts/register-ts-test-resolve.mjs --experimental-strip-types --test 'src/**/*.test.ts'",
     "prepare": "husky",
     "pre-commit": "lint-staged",
     "pre-commit-full": "./scripts/pre-commit-check.sh",
-    "check-all": "npm run lint && npm run type-check && npm run build"
+    "check-all": "npm run lint && npm run type-check && npm test && npm run build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.55.0",
@@ -23,6 +23,7 @@
     "next-auth": "^4.24.11",
     "react": "19.1.5",
     "react-dom": "19.1.5",
+    "server-only": "^0.0.1",
     "zod": "^3.23.8"
   },
   "devDependencies": {

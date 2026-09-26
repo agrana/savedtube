@@ -187,6 +187,12 @@ export default function Dashboard() {
             <span className="hidden rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs font-medium uppercase tracking-[0.24em] text-amber-100/80 sm:inline-flex">
               Dashboard
             </span>
+            <Link
+              href="/paths"
+              className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-stone-200 transition hover:bg-white/[0.06] hover:text-stone-50"
+            >
+              Learning paths
+            </Link>
           </div>
           <div className="flex items-center gap-3 sm:gap-4">
             <div className="hidden items-center gap-3 sm:flex">

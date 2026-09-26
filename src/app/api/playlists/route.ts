@@ -1,25 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { requireApiSessionWithAccessToken } from '@/lib/api-auth';
 
 export async function GET(request: NextRequest) {
   try {
     console.log('Playlists API called');
 
-    // Get user session with access token
-    const session = await getServerSession(authOptions);
-    console.log('Session retrieved:', {
-      hasSession: !!session,
-      hasAccessToken: !!session?.accessToken,
-    });
-
-    if (!session?.accessToken) {
-      console.error('No session or access token found:', {
-        session: !!session,
-        hasAccessToken: !!session?.accessToken,
-      });
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireApiSessionWithAccessToken();
+    if (auth.error) {
+      return auth.error;
     }
+    const { session } = auth;
+    console.log('Session retrieved:', {
+      hasSession: true,
+      hasAccessToken: !!session.accessToken,
+    });
 
     // Get search query if provided
     const { searchParams } = new URL(request.url);

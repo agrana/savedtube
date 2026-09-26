@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
 import { z } from 'zod';
-import { authOptions } from '@/lib/auth';
+import {
+  requireApiSession,
+  requireApiSessionWithAccessToken,
+} from '@/lib/api-auth';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { extractYouTubeVideoId } from '@/lib/validation';
 
@@ -264,7 +266,10 @@ async function fetchYouTubePlaylistItems(
   return { ok: true, status: 200, errorText: '', data };
 }
 
-async function fetchYouTubeVideosByIds(accessToken: string, videoIds: string[]) {
+async function fetchYouTubeVideosByIds(
+  accessToken: string,
+  videoIds: string[]
+) {
   const uniqueIds = [...new Set(videoIds)];
   const allItems: RawVideoResource[] = [];
 
@@ -303,11 +308,11 @@ async function fetchYouTubeVideosByIds(accessToken: string, videoIds: string[]) 
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user?.id || !session?.accessToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireApiSessionWithAccessToken();
+    if (auth.error) {
+      return auth.error;
     }
+    const { session } = auth;
 
     const { searchParams } = new URL(request.url);
     const validation = getPlaylistItemsSchema.safeParse({
@@ -358,7 +363,9 @@ export async function GET(request: NextRequest) {
       editMap.set(edit.video_id, edit);
     }
 
-    const youtubeItems = ((youtubeResult.data?.items || []) as RawPlaylistItem[])
+    const youtubeItems = (
+      (youtubeResult.data?.items || []) as RawPlaylistItem[]
+    )
       .map(normalizePlaylistItem)
       .filter((item): item is PlaylistItem => item !== null)
       .filter((item) => !editMap.get(item.contentDetails.videoId)?.removed);
@@ -370,7 +377,9 @@ export async function GET(request: NextRequest) {
     const addedVideoIds = (editsResult.data || [])
       .filter(
         (edit) =>
-          edit.added_by_user && !edit.removed && !existingVideoIds.has(edit.video_id)
+          edit.added_by_user &&
+          !edit.removed &&
+          !existingVideoIds.has(edit.video_id)
       )
       .map((edit) => edit.video_id);
 
@@ -383,7 +392,10 @@ export async function GET(request: NextRequest) {
       );
 
       if (!addedVideosResult.ok) {
-        console.error('YouTube videos fetch error:', addedVideosResult.errorText);
+        console.error(
+          'YouTube videos fetch error:',
+          addedVideosResult.errorText
+        );
         return NextResponse.json(
           { error: 'Failed to fetch added videos' },
           { status: addedVideosResult.status }
@@ -423,11 +435,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireApiSession();
+    if (auth.error) {
+      return auth.error;
     }
+    const { session } = auth;
 
     const body = await request.json();
     const validation = playlistEditActionSchema.safeParse(body);
@@ -506,6 +518,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const accessToken = session.accessToken;
+
     const videoId = extractYouTubeVideoId(url);
     if (!videoId) {
       return NextResponse.json(
@@ -514,7 +528,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const videosResult = await fetchYouTubeVideosByIds(session.accessToken, [videoId]);
+    const videosResult = await fetchYouTubeVideosByIds(accessToken, [videoId]);
     if (!videosResult.ok) {
       console.error('YouTube add video fetch error:', videosResult.errorText);
       return NextResponse.json(
@@ -562,19 +576,21 @@ export async function POST(request: NextRequest) {
         ? (maxCustomOrderData[0].custom_order as number) + 1
         : 0;
 
-    const { error: upsertError } = await supabase.from('playlist_item_edits').upsert(
-      {
-        user_id: session.user.id,
-        playlist_id: playlistId,
-        video_id: videoId,
-        added_by_user: true,
-        removed: false,
-        custom_order: nextCustomOrder,
-      },
-      {
-        onConflict: 'user_id,playlist_id,video_id',
-      }
-    );
+    const { error: upsertError } = await supabase
+      .from('playlist_item_edits')
+      .upsert(
+        {
+          user_id: session.user.id,
+          playlist_id: playlistId,
+          video_id: videoId,
+          added_by_user: true,
+          removed: false,
+          custom_order: nextCustomOrder,
+        },
+        {
+          onConflict: 'user_id,playlist_id,video_id',
+        }
+      );
 
     if (upsertError) {
       console.error('Add playlist item error:', upsertError);
