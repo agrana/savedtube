@@ -37,8 +37,8 @@ src/
 └── lib/
     ├── auth.ts                     # NextAuth config + token refresh
     ├── supabase.ts                 # Supabase client (service role on server)
-    ├── actions.ts                  # Server Actions (partial adoption)
     ├── validation.ts               # Zod schemas
+    ├── rate-limit.ts               # In-memory API rate limiter
     └── config.ts                   # Env var validation
 supabase/migrations/                # Versioned database schema
 terraform/                          # Cloudflare DNS, email routing, Vercel domain
@@ -55,9 +55,8 @@ terraform/                          # Cloudflare DNS, email routing, Vercel doma
 | `/api/hidden-playlists` | GET, POST | Hide or show playlists on dashboard |
 | `/api/vid-intervals` | GET, POST, PATCH, DELETE | CRUD for practice intervals |
 | `/api/vid-intervals/import` | POST | Import intervals from YouTube chapters |
-| `/api/waiting-list` | POST | Collect waiting-list emails |
 
-Server Actions in `src/lib/actions.ts` provide an alternative path for progress and hidden-playlist mutations, but the dashboard and playlist pages currently use the API routes above.
+Authenticated UI pages call these API routes via `fetch`. Add new mutations as API routes (with session checks + Zod) unless a feature clearly needs Server Actions.
 
 ## Getting Started
 
@@ -147,16 +146,15 @@ Migrations live in `supabase/migrations/`. Main tables:
 | `hidden_playlists` | Playlists a user has hidden from the dashboard |
 | `video_intervals` | Practice loop start/end times per user and video |
 | `playlist_item_edits` | Per-user reorder, soft-remove, and manual video additions |
-| `waiting_list` | Email signups |
 
-User IDs are stored as **TEXT** (NextAuth `sub` claim), not UUIDs. Authorization is enforced in API routes and server actions via NextAuth session checks. The server uses the Supabase **service role key** and filters by `user_id` in application code. RLS is disabled on most application tables.
+User IDs are stored as **TEXT** (NextAuth `sub` claim), not UUIDs. Authorization is enforced in API routes via NextAuth session checks. The server uses the Supabase **service role key** and filters by `user_id` in application code. RLS is disabled on most application tables.
 
 ## Security
 
 - NextAuth JWT sessions (30-day max age) with automatic Google token refresh
 - Middleware protects `/dashboard`, `/p/*`, and selected `/api/*` routes
 - Rate limiting on API routes (in-memory; use Redis for multi-instance production)
-- Zod input validation on API routes and server actions
+- Zod input validation on API routes
 - Security headers and Content Security Policy via middleware
 - Privacy Policy (`/privacy`) and Terms of Service (`/terms`)
 
