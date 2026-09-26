@@ -1,6 +1,6 @@
 # YouTube Playlist Sync — Current State
 
-**Last updated:** June 2026
+**Last updated:** September 2026
 
 ## Architecture
 
@@ -8,6 +8,7 @@
 - **YouTube API**: Server-side calls in API routes using the session access token
 - **Database**: Supabase Postgres with app-level `user_id` filtering (service role key on server)
 - **User IDs**: TEXT (NextAuth `sub`), not Supabase Auth UUIDs
+- **Data access**: API routes only (client pages use `fetch`)
 
 ## API Endpoints
 
@@ -55,11 +56,3 @@ Import intervals from YouTube chapter data.
 - `video_intervals` — practice loop start/end times with optional names
 
 RLS is disabled on these tables; authorization is enforced in API routes via NextAuth session checks.
-
-## Server Actions (partial)
-
-`src/lib/actions.ts` provides server-action alternatives for progress and hidden-playlist mutations. The dashboard and playlist pages still use API routes via `fetch`.
-
-## Shared module note
-
-`src/lib/youtube-server.ts` duplicates YouTube fetch logic but is not yet used by the API routes.

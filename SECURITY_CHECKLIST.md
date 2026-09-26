@@ -11,20 +11,18 @@
 - [x] Automatic Google access-token refresh (`src/lib/auth.ts`)
 - [x] Server-side session validation in API routes
 - [x] Middleware protection for `/dashboard`, `/p/*`, and selected API routes
-- [ ] Migrate all mutations to Server Actions (dashboard and playlist pages still use API routes)
 
 ### Database security
 
 - [x] Parameterized queries via Supabase client (no raw SQL in app code)
-- [x] `user_id` filtering in API routes and server actions
+- [x] `user_id` filtering in API routes
 - [ ] RLS enabled on application tables (currently disabled; auth is app-level with service role key)
 - [x] Database schema managed via versioned migrations
 
 ### Input validation
 
-- [x] Zod schema validation on API routes and server actions
+- [x] Zod schema validation on API routes
 - [x] YouTube ID format validation
-- [x] Email format validation on waiting-list endpoint
 
 ### Security headers and CSP
 
@@ -43,8 +41,7 @@
 
 ### Monitoring and logging
 
-- [x] Security event logging (`src/lib/security-logger.ts`)
-- [x] Auth failure tracking in server actions
+- [ ] Structured security event logging in API routes
 - [ ] Centralized log aggregation in production
 
 ### Legal compliance
