@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireApiSessionWithAccessToken } from '@/lib/api-auth';
-import { config } from '@/lib/config';
+import { config, getResearchModelNotConfiguredError } from '@/lib/config';
 import { parsePathId } from '@/lib/paths';
 import {
   createDefaultResearchDeps,
@@ -51,9 +51,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     if (!config.research.modelApiKey) {
+      const configurationError = getResearchModelNotConfiguredError();
       return NextResponse.json(
         {
-          error: 'Research model is not configured',
+          error: configurationError.message,
           code: 'research_not_configured',
         },
         { status: 503 }
@@ -66,9 +67,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
       deps = createDefaultResearchDeps(supabase);
     } catch (error) {
       console.error('Research deps error:', error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : getResearchModelNotConfiguredError().message;
       return NextResponse.json(
         {
-          error: 'Research model is not configured',
+          error: message,
           code: 'research_not_configured',
         },
         { status: 503 }

@@ -78,6 +78,34 @@ NEXTAUTH_SECRET=
 NEXTAUTH_URL=
 ```
 
+#### Path research model (Preview and Production)
+
+Configure these in the Vercel project for **both Preview and Production** environments.
+Values must be set in the Vercel dashboard (or CLI); they are never committed to git.
+After changing them, **redeploy** Preview/Production so the new values are picked up.
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `RESEARCH_MODEL_API_KEY` | Recommended | Preferred API key for path research / suggestions |
+| `OPENAI_API_KEY` | Fallback | Used only when `RESEARCH_MODEL_API_KEY` is unset **and** `RESEARCH_MODEL_PROVIDER` is `openai` (default) |
+| `RESEARCH_MODEL_PROVIDER` | Optional | Default `openai` |
+| `RESEARCH_MODEL_NAME` | Optional | Default `gpt-4o-mini` |
+| `RESEARCH_MODEL_BASE_URL` | Optional | Preferred base URL; default `https://api.openai.com/v1` |
+| `OPENAI_BASE_URL` | Optional | Fallback base URL only when `RESEARCH_MODEL_BASE_URL` is unset and provider is `openai` |
+
+Example (placeholders only — do not commit real secrets):
+
+```env
+RESEARCH_MODEL_API_KEY=
+# or, for provider=openai only:
+# OPENAI_API_KEY=
+RESEARCH_MODEL_PROVIDER=openai
+RESEARCH_MODEL_NAME=gpt-4o-mini
+RESEARCH_MODEL_BASE_URL=https://api.openai.com/v1
+```
+
+Never set a browser-exposed (`NEXT_PUBLIC_*`) API key for research. Paths can still be created when research is misconfigured; research itself will return an actionable error naming the missing variables.
+
 For CI migration deploys, also set GitHub secrets:
 
 ```env

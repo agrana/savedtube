@@ -132,8 +132,10 @@ Visit [http://localhost:3000](http://localhost:3000).
 
 1. Push to your Git remote.
 2. Connect the repository in Vercel.
-3. Add the environment variables from `.env.local`.
-4. Deploy.
+3. Add the environment variables from `.env.local` / `env.example` for **Preview** and **Production**.
+4. For path research, set `RESEARCH_MODEL_API_KEY` (recommended) or `OPENAI_API_KEY` (openai provider fallback), plus optional `RESEARCH_MODEL_PROVIDER`, `RESEARCH_MODEL_NAME`, and `RESEARCH_MODEL_BASE_URL`. See [SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md).
+5. Redeploy after changing environment variables.
+6. Deploy.
 
 ## Database Schema
 

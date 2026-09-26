@@ -99,9 +99,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
       deps = createDefaultIntervalSuggestionDeps(supabase);
     } catch (error) {
       console.error('Interval suggestion deps error:', error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Suggestion model is not configured. Research cannot run.';
       return NextResponse.json(
         {
-          error: 'Suggestion model is not configured',
+          error: message,
           code: 'suggestions_not_configured',
         },
         { status: 503 }

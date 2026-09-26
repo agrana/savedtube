@@ -1,7 +1,7 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { config } from './config';
+import { config, getResearchModelNotConfiguredError } from './config';
 import { createOpenAiCompatibleResearchProvider } from './llm-provider';
 import {
   type ResearchDeps,
@@ -49,7 +49,7 @@ export function createDefaultResearchDeps(
 ): ResearchDeps {
   const settings = config.research;
   if (!settings.modelApiKey) {
-    throw new Error('RESEARCH_MODEL_API_KEY is not configured');
+    throw getResearchModelNotConfiguredError();
   }
 
   return {
