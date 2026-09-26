@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { requireApiSession } from '@/lib/api-auth';
 import { createServerSupabaseClient } from '@/lib/supabase';
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireApiSession();
+    if (auth.error) {
+      return auth.error;
     }
+    const { session } = auth;
 
     // Create server-side Supabase client with service role key
     const supabase = createServerSupabaseClient();
@@ -41,11 +40,11 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireApiSession();
+    if (auth.error) {
+      return auth.error;
     }
+    const { session } = auth;
 
     const body = await request.json();
     const { playlistId, hidden } = body;

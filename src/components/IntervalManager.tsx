@@ -3,6 +3,15 @@
 import { useState } from 'react';
 import { VideoInterval } from '../types/intervals';
 
+export type IntervalSuggestionView = {
+  id: string;
+  label: string;
+  startTime: number;
+  endTime: number;
+  rationale: string;
+  acceptedIntervalId: string | null;
+};
+
 interface IntervalManagerProps {
   videoId: string;
   intervals: VideoInterval[];
@@ -17,6 +26,17 @@ interface IntervalManagerProps {
   isImporting?: boolean;
   importError?: string | null;
   importMessage?: string | null;
+  suggestions?: IntervalSuggestionView[];
+  suggestionsState?:
+    | 'idle'
+    | 'loading'
+    | 'suggestions'
+    | 'no_chapters'
+    | 'error';
+  suggestionsMessage?: string | null;
+  isAcceptingSuggestion?: boolean;
+  onGenerateSuggestions?: () => Promise<void>;
+  onAcceptSuggestion?: (suggestionId: string) => Promise<void>;
   activeIntervalId?: string | null;
   onSelectInterval?: (interval: VideoInterval) => void;
   isOpen: boolean;
@@ -24,7 +44,6 @@ interface IntervalManagerProps {
 }
 
 export function IntervalManager({
-  videoId,
   intervals,
   loopEnabled,
   videoDuration,
@@ -37,6 +56,12 @@ export function IntervalManager({
   isImporting = false,
   importError,
   importMessage,
+  suggestions = [],
+  suggestionsState = 'idle',
+  suggestionsMessage = null,
+  isAcceptingSuggestion = false,
+  onGenerateSuggestions,
+  onAcceptSuggestion,
   activeIntervalId,
   onSelectInterval,
   isOpen,
@@ -239,6 +264,83 @@ export function IntervalManager({
                 />
               </button>
             </div>
+
+            {/* Suggested practice intervals (path watch) */}
+            {onGenerateSuggestions && (
+              <div className="p-4 rounded-2xl border border-white/10 bg-white/[0.035] space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-medium text-stone-100">
+                      Suggested practice
+                    </h3>
+                    <p className="text-sm text-stone-400">
+                      Rank known YouTube chapter spans for this path video
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void onGenerateSuggestions()}
+                    disabled={suggestionsState === 'loading'}
+                    className="rounded-full bg-amber-300/20 px-4 py-2 text-sm font-medium text-amber-50 ring-1 ring-amber-200/25 transition hover:bg-amber-300/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {suggestionsState === 'loading'
+                      ? 'Suggesting...'
+                      : 'Suggest'}
+                  </button>
+                </div>
+                {suggestionsMessage && (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-sm text-stone-300">
+                    {suggestionsMessage}
+                  </div>
+                )}
+                {suggestionsState === 'no_chapters' && (
+                  <p className="text-sm text-stone-400">
+                    No usable chapters found. Mark intervals manually below —
+                    the player still supports hand-made loops.
+                  </p>
+                )}
+                {suggestions.length > 0 && (
+                  <ul className="space-y-2">
+                    {suggestions.map((suggestion) => (
+                      <li
+                        key={suggestion.id}
+                        className="rounded-xl border border-white/10 bg-[#080806]/60 p-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium text-stone-100">
+                              {suggestion.label}
+                            </div>
+                            <div className="font-mono text-xs text-stone-400">
+                              {formatTime(suggestion.startTime)} →{' '}
+                              {formatTime(suggestion.endTime)}
+                            </div>
+                            <p className="mt-1 text-xs text-stone-500">
+                              {suggestion.rationale}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={
+                              isAcceptingSuggestion ||
+                              Boolean(suggestion.acceptedIntervalId)
+                            }
+                            onClick={() =>
+                              void onAcceptSuggestion?.(suggestion.id)
+                            }
+                            className="shrink-0 rounded-full border border-white/10 bg-stone-100 px-3 py-1 text-xs font-medium text-stone-950 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {suggestion.acceptedIntervalId
+                              ? 'Accepted'
+                              : 'Accept'}
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
 
             {/* Import from YouTube */}
             {onImportFromYouTube && (

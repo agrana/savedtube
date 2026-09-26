@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { requireApiSession } from '@/lib/api-auth';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { validateInput, progressSchema } from '@/lib/validation';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireApiSession();
+    if (auth.error) {
+      return auth.error;
     }
+    const { session } = auth;
 
     const { searchParams } = new URL(request.url);
     const playlistId = searchParams.get('playlistId');
@@ -58,12 +57,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user?.id) {
-      console.log('POST /api/progress: No session or user ID');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireApiSession();
+    if (auth.error) {
+      return auth.error;
     }
+    const { session } = auth;
 
     const body = await request.json();
 
