@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { loadYouTubeIframeApi } from '@/lib/youtube-iframe-api';
 
 interface YouTubePlayerEvent {
   data: number;
@@ -104,6 +105,7 @@ export function YouTubePlayer({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [isYouTubeAPIReady, setIsYouTubeAPIReady] = useState(false);
+  const [apiLoadError, setApiLoadError] = useState<string | null>(null);
   const [playerId] = useState(
     () => `youtube-player-${Math.random().toString(36).substr(2, 9)}`
   );
@@ -121,19 +123,33 @@ export function YouTubePlayer({
   const playThroughIndexRef = useRef(0);
 
   useEffect(() => {
-    // Load YouTube IFrame API
-    if (!window.YT) {
-      const tag = document.createElement('script');
-      tag.src = 'https://www.youtube.com/iframe_api';
-      const firstScriptTag = document.getElementsByTagName('script')[0];
-      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+    let cancelled = false;
 
-      window.onYouTubeIframeAPIReady = () => {
+    loadYouTubeIframeApi()
+      .then(() => {
+        if (cancelled) {
+          return;
+        }
+        setApiLoadError(null);
         setIsYouTubeAPIReady(true);
-      };
-    } else {
-      setIsYouTubeAPIReady(true);
-    }
+      })
+      .catch((error: unknown) => {
+        if (cancelled) {
+          return;
+        }
+        // API transport failures are not player/video errors — keep onError
+        // reserved for YT.Player onError (e.g. unavailable videos).
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'Unable to load YouTube player. Check your connection and try again.';
+        setApiLoadError(message);
+        setIsYouTubeAPIReady(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Note: Removed tab visibility handling to prevent audio glitches
@@ -154,47 +170,56 @@ export function YouTubePlayer({
         playerRef.current.destroy();
       }
 
-      // Create new player with distraction-minimizing parameters
-      playerRef.current = new window.YT.Player(playerId, {
-        height: '100%',
-        width: '100%',
-        videoId: videoId,
-        playerVars: {
-          modestbranding: 1,
-          controls: 1,
-          rel: 0,
-          iv_load_policy: 3,
-          playsinline: 1,
-          enablejsapi: 1,
-          origin: typeof window !== 'undefined' ? window.location.origin : '',
-          showinfo: 0,
-          fs: 1,
-          autoplay: autoPlay ? 1 : 0,
-          mute: 0,
-        },
-        events: {
-          onReady: () => {
-            setIsPlayerReady(true);
-            console.log('YouTube player ready');
-            if (autoPlay) {
-              playerRef.current?.playVideo();
-            }
+      try {
+        // Create new player with distraction-minimizing parameters
+        playerRef.current = new window.YT.Player(playerId, {
+          height: '100%',
+          width: '100%',
+          videoId: videoId,
+          playerVars: {
+            modestbranding: 1,
+            controls: 1,
+            rel: 0,
+            iv_load_policy: 3,
+            playsinline: 1,
+            enablejsapi: 1,
+            origin: typeof window !== 'undefined' ? window.location.origin : '',
+            showinfo: 0,
+            fs: 1,
+            autoplay: autoPlay ? 1 : 0,
+            mute: 0,
           },
-          onStateChange: (event) => {
-            if (event.data === window.YT.PlayerState.ENDED) {
-              onEnd?.();
-            } else if (event.data === window.YT.PlayerState.PLAYING) {
-              onPlay?.();
-            } else if (event.data === window.YT.PlayerState.PAUSED) {
-              onPause?.();
-            }
+          events: {
+            onReady: () => {
+              setIsPlayerReady(true);
+              console.log('YouTube player ready');
+              if (autoPlay) {
+                playerRef.current?.playVideo();
+              }
+            },
+            onStateChange: (event) => {
+              if (event.data === window.YT.PlayerState.ENDED) {
+                onEnd?.();
+              } else if (event.data === window.YT.PlayerState.PLAYING) {
+                onPlay?.();
+              } else if (event.data === window.YT.PlayerState.PAUSED) {
+                onPause?.();
+              }
+            },
+            onError: (event) => {
+              console.error('YouTube player error:', event);
+              onError?.(event);
+            },
           },
-          onError: (event) => {
-            console.error('YouTube player error:', event);
-            onError?.(event);
-          },
-        },
-      });
+        });
+      } catch (error) {
+        console.error('YouTube player construction failed:', error);
+        setApiLoadError(
+          error instanceof Error
+            ? error.message
+            : 'Unable to load YouTube player.'
+        );
+      }
     }
   }, [
     isYouTubeAPIReady,
@@ -396,7 +421,7 @@ export function YouTubePlayer({
         id={playerId}
         className="absolute top-0 left-0 w-full h-full"
       />
-      {!isPlayerReady && (
+      {!isPlayerReady && !apiLoadError && (
         <div className="absolute inset-0 flex items-center justify-center bg-[#10100d]">
           <div className="text-center text-stone-100">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-200 mx-auto mb-4"></div>
@@ -404,6 +429,16 @@ export function YouTubePlayer({
           </div>
         </div>
       )}
+      {apiLoadError ? (
+        <div
+          role="status"
+          className="absolute inset-0 flex items-center justify-center bg-[#10100d] px-6"
+        >
+          <p className="max-w-sm text-center text-sm text-stone-300">
+            {apiLoadError}
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }

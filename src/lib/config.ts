@@ -19,6 +19,10 @@ import {
   RESEARCH_PROMPT_VERSION,
   RESEARCH_SCHEMA_VERSION,
 } from './config-research-defaults';
+import {
+  resolveResearchModelConfig,
+  researchModelNotConfiguredMessage,
+} from './config-research-model';
 
 export {
   RESEARCH_DEFAULT_CANDIDATES_PER_STAGE,
@@ -157,6 +161,15 @@ function loadConfig(): Config {
     'RESEARCH_MAX_DURATION_SECONDS'
   );
 
+  const researchModel = resolveResearchModelConfig({
+    RESEARCH_MODEL_PROVIDER: optionalEnvVar('RESEARCH_MODEL_PROVIDER'),
+    RESEARCH_MODEL_NAME: optionalEnvVar('RESEARCH_MODEL_NAME'),
+    RESEARCH_MODEL_API_KEY: optionalEnvVar('RESEARCH_MODEL_API_KEY'),
+    RESEARCH_MODEL_BASE_URL: optionalEnvVar('RESEARCH_MODEL_BASE_URL'),
+    OPENAI_API_KEY: optionalEnvVar('OPENAI_API_KEY'),
+    OPENAI_BASE_URL: optionalEnvVar('OPENAI_BASE_URL'),
+  });
+
   return {
     supabase: {
       url: validateUrl(
@@ -199,12 +212,10 @@ function loadConfig(): Config {
         RESEARCH_DEFAULT_YOUTUBE_TIMEOUT_MS,
         'RESEARCH_YOUTUBE_TIMEOUT_MS'
       ),
-      modelProvider: optionalEnvVar('RESEARCH_MODEL_PROVIDER') || 'openai',
-      modelName: optionalEnvVar('RESEARCH_MODEL_NAME') || 'gpt-4o-mini',
-      modelApiKey: optionalEnvVar('RESEARCH_MODEL_API_KEY'),
-      modelBaseUrl:
-        optionalEnvVar('RESEARCH_MODEL_BASE_URL') ||
-        'https://api.openai.com/v1',
+      modelProvider: researchModel.modelProvider,
+      modelName: researchModel.modelName,
+      modelApiKey: researchModel.modelApiKey,
+      modelBaseUrl: researchModel.modelBaseUrl,
       userDailyBudget: parseNonNegativeInt(
         process.env.RESEARCH_USER_DAILY_BUDGET,
         RESEARCH_DEFAULT_USER_DAILY_BUDGET,
@@ -238,3 +249,18 @@ export const config: Config = new Proxy({} as Config, {
     return Reflect.get(cachedConfig, property, receiver);
   },
 });
+
+/**
+ * Actionable research-model misconfiguration error (variable names only; no values).
+ */
+export function getResearchModelNotConfiguredError(): Error {
+  const researchModel = resolveResearchModelConfig({
+    RESEARCH_MODEL_PROVIDER: optionalEnvVar('RESEARCH_MODEL_PROVIDER'),
+    RESEARCH_MODEL_NAME: optionalEnvVar('RESEARCH_MODEL_NAME'),
+    RESEARCH_MODEL_API_KEY: optionalEnvVar('RESEARCH_MODEL_API_KEY'),
+    RESEARCH_MODEL_BASE_URL: optionalEnvVar('RESEARCH_MODEL_BASE_URL'),
+    OPENAI_API_KEY: optionalEnvVar('OPENAI_API_KEY'),
+    OPENAI_BASE_URL: optionalEnvVar('OPENAI_BASE_URL'),
+  });
+  return new Error(researchModelNotConfiguredMessage(researchModel));
+}
