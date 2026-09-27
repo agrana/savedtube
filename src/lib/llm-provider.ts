@@ -105,6 +105,7 @@ async function chatJsonCompletion(args: {
 > {
   const started = Date.now();
   const { signal, cleanup } = withTimeoutSignal(args.timeoutMs, args.signal);
+  const jsonSystemMessage = `${args.system}\n\nReturn a valid JSON object only. Do not wrap it in Markdown.`;
 
   try {
     const response = await fetch(
@@ -121,7 +122,7 @@ async function chatJsonCompletion(args: {
           temperature: 0.2,
           response_format: { type: 'json_object' },
           messages: [
-            { role: 'system', content: args.system },
+            { role: 'system', content: jsonSystemMessage },
             { role: 'user', content: args.user },
           ],
         }),
