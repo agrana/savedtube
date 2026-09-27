@@ -166,7 +166,13 @@ export default function PathsPage() {
             )}`
           : `?researchError=${encodeURIComponent(
               researchData.error || 'Research failed'
-            )}`;
+            )}${
+              researchData.code
+                ? `&researchErrorCode=${encodeURIComponent(
+                    String(researchData.code)
+                  )}`
+                : ''
+            }`;
 
       router.push(`/paths/${pathId}${query}`);
     } catch (error) {

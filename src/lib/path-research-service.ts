@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { PATH_ACCESS_ERROR_CODE } from './api-auth-errors';
 import {
   isJobPastDeadline,
   parsePersistedPathRevision,
@@ -1179,10 +1180,12 @@ export async function runPathResearch(args: {
     args.pathId
   );
   if (!pathResult.ok) {
+    const notFound = pathResult.status === 404;
     return {
       ok: false,
-      status: pathResult.status === 404 ? 404 : 500,
+      status: notFound ? 404 : 500,
       error: pathResult.error,
+      ...(notFound ? { code: PATH_ACCESS_ERROR_CODE.PATH_NOT_FOUND } : {}),
     };
   }
 

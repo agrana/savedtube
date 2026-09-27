@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireApiSession } from '@/lib/api-auth';
+import { PATH_ACCESS_ERROR_CODE } from '@/lib/api-auth-errors';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { loadOwnedPathDetail } from '@/lib/path-research';
 import {
@@ -35,7 +36,12 @@ export async function GET(_request: NextRequest, context: RouteContext) {
 
     if (!result.ok) {
       return NextResponse.json(
-        { error: result.error },
+        {
+          error: result.error,
+          ...(result.status === 404
+            ? { code: PATH_ACCESS_ERROR_CODE.PATH_NOT_FOUND }
+            : {}),
+        },
         { status: result.status }
       );
     }

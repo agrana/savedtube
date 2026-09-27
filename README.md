@@ -118,7 +118,9 @@ Authentication is handled by **NextAuth**, not Supabase Auth. You do not need to
    - `https://your-domain.com/api/auth/callback/google` (production)
 4. Configure the OAuth consent screen with scopes:
    - `openid`, `email`, `profile`
-   - `https://www.googleapis.com/auth/youtube.readonly`
+   - `https://www.googleapis.com/auth/youtube.readonly` (required for path research YouTube search)
+
+   Existing browser sessions may need one sign-out and Google sign-in after OAuth scope or token changes so the server receives a fresh YouTube access token. Path research returns `youtube_reauth_required` when the session is signed in but has no usable token.
 
 ### 5. Run locally
 
