@@ -4,6 +4,11 @@ import { getServerSession } from 'next-auth/next';
 import { NextResponse } from 'next/server';
 import type { Session } from 'next-auth';
 import { authOptions } from './auth';
+import {
+  buildUnauthenticatedErrorBody,
+  buildYouTubeReauthErrorBody,
+  sessionMissingYouTubeAccessToken,
+} from './api-auth-errors';
 
 export type ApiSession = Session & {
   user: Session['user'] & { id: string };
@@ -26,7 +31,9 @@ export async function requireApiSession(): Promise<
 
   if (!session?.user?.id) {
     return {
-      error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+      error: NextResponse.json(buildUnauthenticatedErrorBody(), {
+        status: 401,
+      }),
     };
   }
 
@@ -46,9 +53,9 @@ export async function requireApiSessionWithAccessToken(): Promise<
     return result;
   }
 
-  if (!result.session.accessToken || result.session.error) {
+  if (sessionMissingYouTubeAccessToken(result.session)) {
     return {
-      error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+      error: NextResponse.json(buildYouTubeReauthErrorBody(), { status: 401 }),
     };
   }
 

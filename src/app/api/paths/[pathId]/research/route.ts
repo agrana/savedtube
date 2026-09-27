@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireApiSessionWithAccessToken } from '@/lib/api-auth';
 import { config, getResearchModelNotConfiguredError } from '@/lib/config';
 import { parsePathId } from '@/lib/paths';
+import { PATH_ACCESS_ERROR_CODE } from '@/lib/api-auth-errors';
 import {
   createDefaultResearchDeps,
   runPathResearch,
@@ -97,10 +98,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
           ? 429
           : result.status;
 
+      // Ownership failures stay 404 with a stable code (no existence leak).
+      const code =
+        result.code ||
+        (result.status === 404
+          ? PATH_ACCESS_ERROR_CODE.PATH_NOT_FOUND
+          : undefined);
+
       return NextResponse.json(
         {
           error: result.error,
-          code: result.code,
+          ...(code ? { code } : {}),
           job: result.job ?? null,
         },
         { status }
