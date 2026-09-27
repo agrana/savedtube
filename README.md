@@ -137,6 +137,36 @@ Visit [http://localhost:3000](http://localhost:3000).
 5. Redeploy after changing environment variables.
 6. Deploy.
 
+Day-to-day production/preview builds continue to come from the **Vercel Git integration** on push. GitHub Actions secrets are **not** available to Vercel automatically; values must be written into the Vercel project (dashboard, CLI, or the manual workflow below).
+
+#### Manual GitHub → Vercel research key sync
+
+Use [`.github/workflows/configure-vercel-research.yml`](.github/workflows/configure-vercel-research.yml) when you need to replace `RESEARCH_MODEL_API_KEY` on Vercel without editing the dashboard by hand. It is **`workflow_dispatch` only** (never runs on push/PR), so editing the workflow cannot accidentally apply secrets mid-change.
+
+Required GitHub Actions repository secrets (all four must be non-empty and must not contain `REPLACE_WITH_`):
+
+| Secret | Purpose |
+|--------|---------|
+| `RESEARCH_MODEL_API_KEY` | Value written to the selected Vercel environment |
+| `VERCEL_TOKEN` | Vercel CLI authentication |
+| `VERCEL_ORG_ID` | Target Vercel team/org |
+| `VERCEL_PROJECT_ID` | Target Vercel project |
+
+`OPENAI_API_KEY` may exist in GitHub for other reasons; this workflow **does not** copy it to Vercel.
+
+**Run**
+
+1. Confirm the four secrets above are set under the repository’s Actions secrets.
+2. In GitHub: **Actions → Configure Vercel research key → Run workflow**.
+3. Choose `production` (default) or `preview`, then run.
+
+**Behavior**
+
+1. Validates the four secrets (non-empty; rejects `REPLACE_WITH_` placeholders). Secret values are never printed.
+2. Checks out the current `main` tip (not the branch you happen to be viewing).
+3. Installs a pinned Vercel CLI (`60.1.3`) and idempotently replaces `RESEARCH_MODEL_API_KEY` for the selected Vercel environment (`vercel env add … --force --sensitive`).
+4. Deploys that `main` revision to the selected environment with `vercel pull` → `vercel build` → `vercel deploy --prebuilt` (`--prod` when the input is `production`). This CLI deploy is what activates the new env value; it does not rely on a new git push to the Vercel Git integration.
+
 ## Database Schema
 
 Migrations live in `supabase/migrations/`. Main tables:

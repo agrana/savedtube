@@ -1,0 +1,122 @@
+# Manual-only: copies RESEARCH_MODEL_API_KEY from GitHub Actions secrets into
+# the selected Vercel environment, then deploys the current main tip so the
+# new value is active. Day-to-day pushes still deploy via the Vercel Git
+# integration; this workflow does not push to git and does not copy
+# OPENAI_API_KEY.
+name: Configure Vercel research key
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Vercel environment to update and redeploy
+        required: true
+        type: choice
+        options:
+          - production
+          - preview
+        default: production
+
+permissions:
+  contents: read
+
+env:
+  VERCEL_CLI_VERSION: '60.1.3'
+
+jobs:
+  configure-and-deploy:
+    name: Replace research key and deploy main
+    runs-on: ubuntu-latest
+
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      RESEARCH_MODEL_API_KEY: ${{ secrets.RESEARCH_MODEL_API_KEY }}
+      TARGET_ENVIRONMENT: ${{ inputs.environment }}
+
+    steps:
+      - name: Validate required secrets
+        run: |
+          set -euo pipefail
+
+          require_secret() {
+            local name="$1"
+            local value="$2"
+
+            if [ -z "${value}" ]; then
+              echo "Missing or empty required secret: ${name}"
+              exit 1
+            fi
+
+            case "${value}" in
+              *REPLACE_WITH_*)
+                echo "Secret ${name} still contains placeholder text REPLACE_WITH_"
+                exit 1
+                ;;
+            esac
+
+            echo "Secret ${name}: present"
+          }
+
+          require_secret RESEARCH_MODEL_API_KEY "${RESEARCH_MODEL_API_KEY}"
+          require_secret VERCEL_TOKEN "${VERCEL_TOKEN}"
+          require_secret VERCEL_ORG_ID "${VERCEL_ORG_ID}"
+          require_secret VERCEL_PROJECT_ID "${VERCEL_PROJECT_ID}"
+
+          case "${TARGET_ENVIRONMENT}" in
+            production|preview)
+              echo "Target Vercel environment: ${TARGET_ENVIRONMENT}"
+              ;;
+            *)
+              echo "Unsupported environment input: ${TARGET_ENVIRONMENT}"
+              exit 1
+              ;;
+          esac
+
+          echo "OPENAI_API_KEY is intentionally not copied to Vercel by this workflow."
+
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Vercel CLI
+        run: npm install --global "vercel@${VERCEL_CLI_VERSION}"
+
+      - name: Replace RESEARCH_MODEL_API_KEY on Vercel
+        run: |
+          set -euo pipefail
+
+          # Idempotent overwrite for the selected environment only.
+          # Value is supplied on stdin so it is never printed by this step.
+          printf '%s' "${RESEARCH_MODEL_API_KEY}" | vercel env add RESEARCH_MODEL_API_KEY "${TARGET_ENVIRONMENT}" \
+            --force \
+            --sensitive \
+            --yes
+
+          echo "Replaced RESEARCH_MODEL_API_KEY for Vercel environment: ${TARGET_ENVIRONMENT}"
+
+      - name: Deploy current main to selected Vercel environment
+        run: |
+          set -euo pipefail
+
+          MAIN_SHA="$(git rev-parse HEAD)"
+          echo "Deploying main revision ${MAIN_SHA} to ${TARGET_ENVIRONMENT}"
+
+          vercel pull --yes --environment="${TARGET_ENVIRONMENT}"
+
+          if [ "${TARGET_ENVIRONMENT}" = "production" ]; then
+            vercel build --prod
+            vercel deploy --prebuilt --prod --yes
+          else
+            vercel build
+            vercel deploy --prebuilt --yes
+          fi
+
+          echo "Deploy finished for ${TARGET_ENVIRONMENT} at main ${MAIN_SHA}"
