@@ -96,6 +96,9 @@ jobs:
           # Idempotent overwrite for the selected environment only.
           # Value is supplied on stdin so it is never printed by this step.
           printf '%s' "${RESEARCH_MODEL_API_KEY}" | vercel env add RESEARCH_MODEL_API_KEY "${TARGET_ENVIRONMENT}" \
+            --project "${VERCEL_PROJECT_ID}" \
+            --scope "${VERCEL_ORG_ID}" \
+            --token "${VERCEL_TOKEN}" \
             --force \
             --sensitive \
             --yes
@@ -109,14 +112,25 @@ jobs:
           MAIN_SHA="$(git rev-parse HEAD)"
           echo "Deploying main revision ${MAIN_SHA} to ${TARGET_ENVIRONMENT}"
 
-          vercel pull --yes --environment="${TARGET_ENVIRONMENT}"
+          vercel pull --yes --environment="${TARGET_ENVIRONMENT}" \
+            --project "${VERCEL_PROJECT_ID}" \
+            --scope "${VERCEL_ORG_ID}" \
+            --token "${VERCEL_TOKEN}"
 
           if [ "${TARGET_ENVIRONMENT}" = "production" ]; then
             vercel build --prod
-            vercel deploy --prebuilt --prod --yes
+            vercel deploy --prebuilt --prod \
+              --project "${VERCEL_PROJECT_ID}" \
+              --scope "${VERCEL_ORG_ID}" \
+              --token "${VERCEL_TOKEN}" \
+              --yes
           else
             vercel build
-            vercel deploy --prebuilt --yes
+            vercel deploy --prebuilt \
+              --project "${VERCEL_PROJECT_ID}" \
+              --scope "${VERCEL_ORG_ID}" \
+              --token "${VERCEL_TOKEN}" \
+              --yes
           fi
 
           echo "Deploy finished for ${TARGET_ENVIRONMENT} at main ${MAIN_SHA}"
