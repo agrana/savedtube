@@ -32,9 +32,9 @@ export default function TermsPage() {
               2. Description of service
             </h2>
             <p className="mb-6 text-gray-700">
-              SavedTube provides a distraction-free player for your existing
-              YouTube playlists. You must have a valid Google account to use the
-              service.
+              SavedTube turns a learning goal into a guided sequence of YouTube
+              lessons, practice loops, and recall activities. You must have a
+              valid Google account to use the authenticated features.
             </p>
 
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">
@@ -62,7 +62,8 @@ export default function TermsPage() {
               <ul className="list-disc pl-6 space-y-2 text-gray-800">
                 <li>
                   SavedTube requires read-only access (youtube.readonly) to your
-                  YouTube playlists.
+                  YouTube account so it can find lessons for your learning
+                  paths.
                 </li>
                 <li>We never modify or delete data in your YouTube account.</li>
               </ul>

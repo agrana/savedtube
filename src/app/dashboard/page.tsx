@@ -185,7 +185,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-4">
             <Logo size="lg" variant="white" showText={true} />
             <span className="hidden rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs font-medium uppercase tracking-[0.24em] text-amber-100/80 sm:inline-flex">
-              Dashboard
+              Legacy playlist library
             </span>
             <Link
               href="/paths"
@@ -222,14 +222,14 @@ export default function Dashboard() {
       <main className="relative z-10 mx-auto max-w-7xl px-5 py-10 sm:px-8 lg:py-14">
         <section className="mb-9 max-w-3xl">
           <p className="font-mono text-xs uppercase tracking-[0.28em] text-amber-100/70">
-            YouTube practice library
+            Legacy playlist library
           </p>
           <h1 className="mt-4 text-4xl font-medium leading-[0.95] tracking-[-0.055em] text-stone-50 sm:text-5xl">
-            Choose a playlist and turn it into focused reps.
+            Revisit your imported playlists and focused practice sessions.
           </h1>
           <p className="mt-5 max-w-2xl text-lg leading-8 text-stone-400">
-            Your imported YouTube playlists now live in the same calm practice
-            room as the landing page.
+            This preserved library keeps the earlier playlist workflow available
+            while learning paths remain the primary SavedTube experience.
           </p>
         </section>
 
