@@ -7,9 +7,9 @@ import Footer from '@/components/Footer';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'SavedTube - YouTube Practice Loops',
+  title: 'SavedTube - Learning Paths',
   description:
-    'Import YouTube playlists and turn the useful parts into precise practice loops.',
+    'Turn a learning goal into a guided path of YouTube lessons and focused practice.',
   icons: {
     icon: [
       {

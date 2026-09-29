@@ -221,12 +221,6 @@ export default function PathsPage() {
             </span>
           </div>
           <div className="flex items-center gap-3 sm:gap-4">
-            <Link
-              href="/dashboard"
-              className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-stone-200 transition hover:bg-white/[0.06] hover:text-stone-50"
-            >
-              Saved playlists
-            </Link>
             <div className="hidden items-center gap-3 sm:flex">
               {session.user?.image && (
                 <Image

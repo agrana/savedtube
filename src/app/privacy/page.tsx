@@ -22,8 +22,8 @@ export default function PrivacyPage() {
 
             <p className="mb-6 text-gray-700">
               SavedTube (&ldquo;we&rdquo;, &ldquo;our&rdquo;, &ldquo;us&rdquo;)
-              provides a distraction-free interface to view your own saved
-              YouTube playlists.
+              helps you turn learning goals into guided paths of YouTube lessons
+              and focused practice.
             </p>
 
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">
@@ -36,9 +36,9 @@ export default function PrivacyPage() {
                 (name, email, avatar) for sign-in.
               </li>
               <li>
-                <strong>YouTube data:</strong> playlists and videos you have
-                saved in your account, retrieved using the YouTube API
-                (youtube.readonly scope).
+                <strong>YouTube data:</strong> lesson search results and video
+                metadata retrieved using the YouTube API (youtube.readonly
+                scope) to research your learning paths.
               </li>
             </ul>
 
@@ -49,8 +49,8 @@ export default function PrivacyPage() {
             <ul className="list-disc pl-6 mb-6 space-y-2 text-gray-700">
               <li>To let you log in securely with your Google account.</li>
               <li>
-                To display your playlists/videos inside the SavedTube
-                application.
+                To research and display YouTube lessons inside your SavedTube
+                learning paths.
               </li>
               <li>
                 To improve your experience (e.g., saving your display
@@ -73,7 +73,7 @@ export default function PrivacyPage() {
             <ul className="list-disc pl-6 mb-6 space-y-2 text-gray-700">
               <li>
                 Data is stored in Supabase (Postgres) with row-level security so
-                only you can access your playlists.
+                only you can access your learning paths and practice data.
               </li>
               <li>
                 Access tokens are stored securely and refreshed automatically.
