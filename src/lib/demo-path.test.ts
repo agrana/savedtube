@@ -234,7 +234,7 @@ describe('logged-out route behavior', () => {
     assert.match(demo, /YouTubePlayer/);
     assert.match(demo, /PathMap/);
     assert.match(demo, /callbackUrl: PATHS_CALLBACK_URL/);
-    assert.match(demo, /PATHS_CALLBACK_URL = '\/paths'/);
+    assert.match(demo, /PATHS_CALLBACK_URL = '\/'/);
   });
 });
 

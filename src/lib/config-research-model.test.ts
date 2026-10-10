@@ -143,7 +143,10 @@ describe('researchModelNotConfiguredMessage', () => {
 
 describe('path create preserves shell when research is misconfigured', () => {
   it('navigates to the saved path with researchError query on research failure', () => {
-    const source = readFileSync(join(root, 'src/app/paths/page.tsx'), 'utf8');
+    const source = readFileSync(
+      join(root, 'src/app/paths/new/page.tsx'),
+      'utf8'
+    );
     assert.match(source, /Always open the saved path/);
     assert.match(source, /researchError=/);
     assert.match(source, /router\.push\(`\/paths\/\$\{pathId\}/);

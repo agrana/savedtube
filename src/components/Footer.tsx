@@ -8,8 +8,8 @@ export default function Footer() {
           <div>
             <Logo size="md" showText={false} variant="white" className="mb-3" />
             <p className="max-w-sm text-sm text-stone-500">
-              A quiet YouTube practice studio for precise loops and focused
-              sessions.
+              A calm learning studio for guided paths, focused practice, and
+              recall.
             </p>
           </div>
 

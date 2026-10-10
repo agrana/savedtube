@@ -1,7 +1,9 @@
 'use client';
 
+import { useSession } from 'next-auth/react';
 import Logo from '@/components/Logo';
 import DemoPathLanding from '@/components/DemoPathLanding';
+import OwnedPathsDashboard from '@/components/OwnedPathsDashboard';
 
 function UpgradeButton() {
   return (
@@ -14,7 +16,7 @@ function UpgradeButton() {
   );
 }
 
-export default function Home() {
+function PublicLanding() {
   return (
     <main className="min-h-screen overflow-hidden bg-[#080806] text-stone-100">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.16),transparent_42%),linear-gradient(180deg,rgba(255,255,255,0.045),transparent_55%)]" />
@@ -78,4 +80,22 @@ export default function Home() {
       </section>
     </main>
   );
+}
+
+export default function Home() {
+  const { status } = useSession();
+
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-[#080806] text-stone-100 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-24 w-24 border-b-2 border-amber-200" />
+      </div>
+    );
+  }
+
+  if (status === 'authenticated') {
+    return <OwnedPathsDashboard />;
+  }
+
+  return <PublicLanding />;
 }

@@ -9,6 +9,7 @@ import {
   createOwnedPath,
   deleteOwnedPath,
   derivePathTitle,
+  fallbackPathDisplayFields,
   getOwnedPath,
   isConflictError,
   listOwnedPaths,
@@ -28,9 +29,13 @@ function makePath(
   overrides: Partial<PathRecord> & Pick<PathRecord, 'id' | 'owner' | 'goal'>
 ): PathRecord {
   const goal = overrides.goal;
+  const title = derivePathTitle(goal, overrides.title);
+  const display = fallbackPathDisplayFields({ goal, title });
   return {
     background: null,
-    title: derivePathTitle(goal, overrides.title),
+    title,
+    display_objective: display.display_objective,
+    display_path: display.display_path,
     created_at: '2026-09-26T12:00:00.000Z',
     updated_at: '2026-09-26T12:00:00.000Z',
     ...overrides,
@@ -189,13 +194,22 @@ function createMemoryPathsClient(initial: StoreRow[] = []) {
       }> {
         if (state.mode === 'insert' && state.pendingInsert) {
           const now = new Date().toISOString();
+          const goal = String(state.pendingInsert.goal);
+          const title = String(state.pendingInsert.title);
+          const display = fallbackPathDisplayFields({ goal, title });
           const row = makePath({
             id: crypto.randomUUID(),
             owner: String(state.pendingInsert.owner),
-            goal: String(state.pendingInsert.goal),
+            goal,
             background:
               (state.pendingInsert.background as string | null) ?? null,
-            title: String(state.pendingInsert.title),
+            title,
+            display_objective:
+              (state.pendingInsert.display_objective as string | undefined) ||
+              display.display_objective,
+            display_path:
+              (state.pendingInsert.display_path as string | undefined) ||
+              display.display_path,
             created_at: now,
             updated_at: now,
           });
@@ -370,6 +384,10 @@ describe('path CRUD service (in-memory)', () => {
     }
     assert.equal(created.path.owner, 'user-a');
     assert.equal(created.path.title, 'Pass the CKA');
+    assert.equal(created.path.display_objective, 'Pass the CKA');
+    assert.equal(created.path.display_path, 'Pass the CKA');
+    assert.equal(created.path.goal, 'Pass the CKA');
+    assert.equal(created.path.background, 'Linux admin');
 
     const second = await createOwnedPath(client, 'user-a', {
       goal: 'Learn darts',

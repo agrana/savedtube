@@ -1,6 +1,6 @@
 # SavedTube
 
-A quiet YouTube practice studio for precise loops and focused sessions. Import your saved playlists, mark the useful parts of each video, and return to them for deliberate practice.
+A calm learning studio for guided YouTube paths, focused practice, and recall.
 
 ## Features
 

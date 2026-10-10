@@ -20,7 +20,7 @@ import {
   type DemoPathVideo,
 } from '@/lib/demo-path';
 
-const PATHS_CALLBACK_URL = '/paths';
+const PATHS_CALLBACK_URL = '/';
 
 assertDemoFixtureSafety(DEMO_PATH_FIXTURE);
 

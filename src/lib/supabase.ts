@@ -159,6 +159,8 @@ export type Database = {
           goal: string;
           background: string | null;
           title: string;
+          display_objective: string;
+          display_path: string;
           active_revision_id: string | null;
           created_at: string;
           updated_at: string;
@@ -169,6 +171,8 @@ export type Database = {
           goal: string;
           background?: string | null;
           title: string;
+          display_objective: string;
+          display_path: string;
           active_revision_id?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -179,6 +183,8 @@ export type Database = {
           goal?: string;
           background?: string | null;
           title?: string;
+          display_objective?: string;
+          display_path?: string;
           active_revision_id?: string | null;
           created_at?: string;
           updated_at?: string;

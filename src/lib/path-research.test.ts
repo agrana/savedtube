@@ -105,9 +105,12 @@ function makeSettings(
 function makePath(
   overrides: Partial<PathRecord> & Pick<PathRecord, 'id' | 'owner' | 'goal'>
 ): PathRecord {
+  const title = derivePathTitle(overrides.goal, overrides.title);
   return {
     background: null,
-    title: derivePathTitle(overrides.goal, overrides.title),
+    title,
+    display_objective: overrides.goal,
+    display_path: title,
     active_revision_id: null,
     created_at: '2026-09-26T12:00:00.000Z',
     updated_at: '2026-09-26T12:00:00.000Z',
