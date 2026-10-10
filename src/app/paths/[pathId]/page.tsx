@@ -13,11 +13,14 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
 import PathMap from '@/components/PathMap';
+import PathDismissedVideosReview from '@/components/PathDismissedVideosReview';
+import PathVideoDismissControl from '@/components/PathVideoDismissControl';
 import QuizReviewPanel from '@/components/QuizReviewPanel';
 import {
   isYouTubeReauthErrorCode,
   YOUTUBE_REAUTH_REQUIRED_MESSAGE,
 } from '@/lib/api-auth-errors';
+import type { PathVideoDismissalReviewItem } from '@/lib/path-dismissals';
 import type { PathRecord } from '@/lib/paths';
 import type {
   PathJobPublicView,
@@ -117,6 +120,9 @@ export default function PathDetailPage() {
     Record<string, string>
   >({});
   const [isCompletingStage, setIsCompletingStage] = useState(false);
+  const [dismissedVideos, setDismissedVideos] = useState<
+    PathVideoDismissalReviewItem[]
+  >([]);
 
   const fetchPath = useCallback(async () => {
     if (!pathId) {
@@ -126,10 +132,12 @@ export default function PathDetailPage() {
 
     setPageState({ status: 'loading' });
     try {
-      const [pathResponse, progressResponse] = await Promise.all([
-        fetch(`/api/paths/${pathId}`),
-        fetch(`/api/paths/${pathId}/progress`),
-      ]);
+      const [pathResponse, progressResponse, dismissalsResponse] =
+        await Promise.all([
+          fetch(`/api/paths/${pathId}`),
+          fetch(`/api/paths/${pathId}/progress`),
+          fetch(`/api/paths/${pathId}/dismissals`),
+        ]);
 
       if (pathResponse.status === 401) {
         setPageState({
@@ -150,6 +158,14 @@ export default function PathDetailPage() {
       if (progressResponse.ok) {
         const progressData = await progressResponse.json();
         progress = (progressData.progress as PathProgressSummary) || null;
+      }
+      if (dismissalsResponse.ok) {
+        const dismissalsData = await dismissalsResponse.json();
+        setDismissedVideos(
+          (dismissalsData.dismissals as PathVideoDismissalReviewItem[]) || []
+        );
+      } else {
+        setDismissedVideos([]);
       }
 
       setPageState({
@@ -752,6 +768,12 @@ export default function PathDetailPage() {
               />
             </section>
 
+            <PathDismissedVideosReview
+              pathId={pathId}
+              dismissals={dismissedVideos}
+              onRestored={() => fetchPath()}
+            />
+
             {pageState.stages.length === 0 ? (
               <section className="rounded-[1.5rem] border border-dashed border-white/15 bg-[#10100d]/60 px-6 py-14 text-center">
                 <h2 className="text-xl font-medium tracking-[-0.03em] text-stone-100">
@@ -1136,31 +1158,14 @@ export default function PathDetailPage() {
                                     >
                                       {practiced ? 'Unmark' : 'Practiced'}
                                     </button>
-                                    <button
-                                      type="button"
-                                      disabled={
-                                        isApplyingEdit || !pageState.revision
-                                      }
-                                      onClick={() => {
-                                        if (!pageState.revision) return;
-                                        if (
-                                          !window.confirm(
-                                            'Remove this video from the path?'
-                                          )
-                                        ) {
-                                          return;
-                                        }
-                                        void applyEdit({
-                                          action: 'remove_item',
-                                          pathVideoId: video.id,
-                                          expectedEditVersion:
-                                            pageState.revision.edit_version,
-                                        });
-                                      }}
-                                      className="rounded-full border border-red-300/25 px-2.5 py-1 text-xs text-red-100 disabled:opacity-40"
-                                    >
-                                      Remove
-                                    </button>
+                                    <PathVideoDismissControl
+                                      pathId={pathId}
+                                      pathVideoId={video.id}
+                                      youtubeVideoId={video.youtube_video_id}
+                                      videoTitle={video.title}
+                                      disabled={isApplyingEdit}
+                                      onDismissed={() => void fetchPath()}
+                                    />
                                   </div>
                                 </div>
                                 <form

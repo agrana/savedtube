@@ -4,6 +4,7 @@ import {
   type PathStageWithVideos,
   type PathVideoRecord,
 } from './path-research-schema';
+import { filterStagesExcludingActiveDismissals } from './path-dismissal-filter';
 import { flattenPathVideos } from './path-edits';
 import { getOwnedPath, type PathRecord } from './paths';
 import {
@@ -279,10 +280,21 @@ async function loadRevisionMembership(
     videos: videosByStage.get(stage.id) || [],
   }));
 
+  // Membership/progress ids stay complete; presentation stages hide dismissals.
+  const filtered = await filterStagesExcludingActiveDismissals(
+    db,
+    ownerId,
+    pathId,
+    stagesWithVideos
+  );
+  if (!filtered.ok) {
+    return filtered;
+  }
+
   return {
     ok: true,
     path: owned.path,
-    stages: stagesWithVideos,
+    stages: filtered.stages,
     videoIds: new Set(videos.map((video) => video.id)),
     stageIds,
     activeRevisionId,

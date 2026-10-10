@@ -6,11 +6,13 @@ import { fileURLToPath } from 'node:url';
 import {
   API_AUTH_ERROR_CODE,
   buildPathNotFoundErrorBody,
+  buildReviewerForbiddenErrorBody,
   buildUnauthenticatedErrorBody,
   buildYouTubeReauthErrorBody,
   isYouTubeReauthErrorCode,
   PATH_ACCESS_ERROR_CODE,
   PATH_NOT_FOUND_MESSAGE,
+  REVIEWER_FORBIDDEN_MESSAGE,
   sessionMissingYouTubeAccessToken,
   UNAUTHENTICATED_MESSAGE,
   YOUTUBE_REAUTH_REQUIRED_MESSAGE,
@@ -41,6 +43,16 @@ describe('api-auth error bodies', () => {
     const body = buildPathNotFoundErrorBody();
     assert.equal(body.code, PATH_ACCESS_ERROR_CODE.PATH_NOT_FOUND);
     assert.equal(body.error, PATH_NOT_FOUND_MESSAGE);
+  });
+
+  it('returns stable reviewer_forbidden 403 payload without allowlist details', () => {
+    const body = buildReviewerForbiddenErrorBody();
+    assert.equal(body.code, API_AUTH_ERROR_CODE.REVIEWER_FORBIDDEN);
+    assert.equal(body.error, REVIEWER_FORBIDDEN_MESSAGE);
+    assert.doesNotMatch(
+      JSON.stringify(body),
+      /SAVEDTUBE_REVIEWER_IDS|allowlist/i
+    );
   });
 });
 

@@ -18,8 +18,20 @@ import {
   type ResearchPlan,
   type ResearchSelection,
 } from './path-research-schema';
+import {
+  excludeActiveDismissedPathVideos,
+  loadActiveDismissedPathVideoIds,
+} from './path-dismissal-filter';
 import type { PathRecord } from './paths';
 import { getOwnedPath, resolveOwnedPathAccess } from './paths';
+import {
+  assertSelectionRespectsPathVideoRules,
+  buildPathVideoRuleResearchSnapshot,
+  filterResearchCandidatesByPathVideoRules,
+  loadActivePathVideoRulesForResearch,
+  mergePathVideoRuleSnapshotIntoInput,
+  type PathVideoRulePromptConstraints,
+} from './path-video-rule-research';
 
 export type ResearchSettings = {
   enabled: boolean;
@@ -55,6 +67,7 @@ export type ResearchLlmProvider = {
     goal: string;
     background: string | null;
     maxStages: number;
+    pathVideoRuleConstraints?: PathVideoRulePromptConstraints | null;
     signal?: AbortSignal;
     timeoutMs: number;
   }) => Promise<LlmCallResult<ResearchPlan>>;
@@ -64,6 +77,7 @@ export type ResearchLlmProvider = {
     plan: ResearchPlan;
     candidatesByStage: ReadonlyMap<number, ReadonlyArray<ResearchCandidate>>;
     maxVideosPerStage: number;
+    pathVideoRuleConstraints?: PathVideoRulePromptConstraints | null;
     signal?: AbortSignal;
     timeoutMs: number;
   }) => Promise<LlmCallResult<ResearchSelection>>;
@@ -144,6 +158,7 @@ async function updateJob(
     result: Record<string, unknown> | null;
     error: Record<string, unknown> | null;
     usage: Record<string, unknown> | null;
+    input_snapshot: Record<string, unknown>;
     started_at: string | null;
     finished_at: string | null;
     prompt_version: string | null;
@@ -369,13 +384,21 @@ export async function loadOwnedPathDetail(
   const latestJobRow =
     ((jobRows || [])[0] as PathJobRecord | undefined) || null;
 
+  const dismissals = await loadActiveDismissedPathVideoIds(db, ownerId, pathId);
+  if (!dismissals.ok) {
+    return dismissals;
+  }
+
   return {
     ok: true,
     path,
     revision,
-    stages,
+    stages: excludeActiveDismissedPathVideos(stages, dismissals.pathVideoIds),
     draftRevision,
-    draftStages,
+    draftStages: excludeActiveDismissedPathVideos(
+      draftStages,
+      dismissals.pathVideoIds
+    ),
     latestJob: latestJobRow ? toPathJobPublicView(latestJobRow) : null,
   };
 }
@@ -934,10 +957,35 @@ export async function executeResearchPipeline(args: {
       ? job.input_snapshot.background
       : null;
 
+  const activeRulesResult = await loadActivePathVideoRulesForResearch(deps.db);
+  if (!activeRulesResult.ok) {
+    return fail('path_video_rules_load_failed', activeRulesResult.error);
+  }
+
+  const pathVideoRuleConstraints = activeRulesResult.promptConstraints;
+  let ruleSnapshot = buildPathVideoRuleResearchSnapshot({
+    activeRules: activeRulesResult.rules,
+    executableRules: activeRulesResult.executableRules,
+    excludedCandidates: [],
+  });
+  const snapshotWithRules = mergePathVideoRuleSnapshotIntoInput(
+    job.input_snapshot,
+    ruleSnapshot
+  );
+  const snapshotUpdated = await updateJob(deps.db, job.id, {
+    input_snapshot: snapshotWithRules,
+  });
+  if (snapshotUpdated) {
+    job = snapshotUpdated;
+  } else {
+    job = { ...job, input_snapshot: snapshotWithRules };
+  }
+
   const planResult = await deps.llm.planStages({
     goal,
     background,
     maxStages: settings.maxStages,
+    pathVideoRuleConstraints,
     timeoutMs: settings.providerTimeoutMs,
     signal: controller.signal,
   });
@@ -988,7 +1036,40 @@ export async function executeResearchPipeline(args: {
     );
   }
 
-  const candidatesByStage = searchResult.candidatesByStage;
+  const filtered = filterResearchCandidatesByPathVideoRules({
+    candidatesByStage: searchResult.candidatesByStage,
+    rules: activeRulesResult.executableRules,
+  });
+  const candidatesByStage = filtered.candidatesByStage;
+  const emptyStagesAfterRules = [
+    ...new Set([...searchResult.emptyStages, ...filtered.emptyStages]),
+  ].sort((a, b) => a - b);
+
+  ruleSnapshot = buildPathVideoRuleResearchSnapshot({
+    activeRules: activeRulesResult.rules,
+    executableRules: activeRulesResult.executableRules,
+    excludedCandidates: filtered.excludedCandidates,
+  });
+  const snapshotWithExclusions = mergePathVideoRuleSnapshotIntoInput(
+    job.input_snapshot,
+    ruleSnapshot
+  );
+  const exclusionSnapshotUpdated = await updateJob(deps.db, job.id, {
+    input_snapshot: snapshotWithExclusions,
+  });
+  if (exclusionSnapshotUpdated) {
+    job = exclusionSnapshotUpdated;
+  } else {
+    job = { ...job, input_snapshot: snapshotWithExclusions };
+  }
+
+  if (emptyStagesAfterRules.length === plan.stages.length) {
+    return fail(
+      'no_candidates',
+      'No playable YouTube videos matched this path after applying active path video rules. Try refining the goal or background.',
+      'failed'
+    );
+  }
 
   await updateJob(deps.db, job.id, {
     phase: 'selecting',
@@ -1001,6 +1082,7 @@ export async function executeResearchPipeline(args: {
     plan,
     candidatesByStage,
     maxVideosPerStage: settings.maxVideosPerStage,
+    pathVideoRuleConstraints,
     timeoutMs: settings.providerTimeoutMs,
     signal: controller.signal,
   });
@@ -1009,7 +1091,7 @@ export async function executeResearchPipeline(args: {
     'selecting',
     selectionResult.ok ? selectionResult.usage : undefined,
     selectionResult.latencyMs,
-    { emptyStages: searchResult.emptyStages }
+    { emptyStages: emptyStagesAfterRules }
   );
   tick();
 
@@ -1017,6 +1099,14 @@ export async function executeResearchPipeline(args: {
     const status =
       selectionResult.code === 'model_timeout' ? 'interrupted' : 'failed';
     return fail(selectionResult.code, selectionResult.message, status);
+  }
+
+  const ruleGuard = assertSelectionRespectsPathVideoRules(
+    selectionResult.data,
+    filtered.excludedCandidates
+  );
+  if (!ruleGuard.ok) {
+    return fail('invalid_selection', ruleGuard.error);
   }
 
   const candidateCheck = validateSelectionAgainstCandidates(
@@ -1087,7 +1177,7 @@ export async function executeResearchPipeline(args: {
   }
 
   const inputSnapshot: Record<string, unknown> = {
-    ...job.input_snapshot,
+    ...mergePathVideoRuleSnapshotIntoInput(job.input_snapshot, ruleSnapshot),
     ...(asDraft
       ? {
           regeneration: true,
@@ -1117,7 +1207,7 @@ export async function executeResearchPipeline(args: {
   }
 
   const partial =
-    searchResult.emptyStages.length > 0 ||
+    emptyStagesAfterRules.length > 0 ||
     persisted.stages.length < plan.stages.length;
 
   const finished = await updateJob(deps.db, job.id, {
@@ -1143,7 +1233,7 @@ export async function executeResearchPipeline(args: {
       revisionNumber: saved.revisionNumber,
       revisionStatus: saved.status,
       stageCount: persisted.stages.length,
-      emptyStages: searchResult.emptyStages,
+      emptyStages: emptyStagesAfterRules,
       baseEditVersion: activeEditVersion,
     },
     usage: usageAcc,

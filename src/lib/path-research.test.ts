@@ -224,13 +224,37 @@ function createFakeYouTube(handlers?: {
   };
 }
 
+type PathVideoRuleRow = {
+  id: string;
+  source_candidate_id: string;
+  rule_key: string;
+  target_type: 'video' | 'creator' | 'topic' | 'language' | 'difficulty';
+  operator: 'equals';
+  value: string;
+  action: 'exclude';
+  reason: string;
+  status: 'draft' | 'active' | 'suspended' | 'retired';
+  version: number;
+  activated_by: string | null;
+  activated_at: string | null;
+  review_due_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 /** In-memory Supabase surface for research jobs, budgets, and revision persistence. */
-function createMemoryResearchDb(initialPaths: PathRecord[] = []) {
+function createMemoryResearchDb(
+  initialPaths: PathRecord[] = [],
+  options?: { pathVideoRules?: PathVideoRuleRow[] }
+) {
   const paths = initialPaths.map((path) => ({ ...path }));
   const jobs: PathJobRecord[] = [];
   const revisions: PathRevisionRow[] = [];
   const stages: PathStageRow[] = [];
   const videos: PathVideoRow[] = [];
+  const pathVideoRules: PathVideoRuleRow[] = [
+    ...(options?.pathVideoRules ?? []),
+  ];
   const usage: GenerationUsageRow[] = [];
   const today = '2026-09-26';
 
@@ -278,6 +302,8 @@ function createMemoryResearchDb(initialPaths: PathRecord[] = []) {
         return stages as unknown as Record<string, unknown>[];
       case 'path_videos':
         return videos as unknown as Record<string, unknown>[];
+      case 'path_video_rules':
+        return pathVideoRules as unknown as Record<string, unknown>[];
       default:
         throw new Error(`Unexpected table ${table}`);
     }
@@ -678,7 +704,28 @@ function createMemoryResearchDb(initialPaths: PathRecord[] = []) {
     revisions,
     stages,
     videos,
+    pathVideoRules,
     usage,
+  };
+}
+
+function makeActiveVideoRule(
+  overrides: Partial<PathVideoRuleRow> &
+    Pick<PathVideoRuleRow, 'id' | 'rule_key' | 'target_type' | 'value'>
+): PathVideoRuleRow {
+  return {
+    source_candidate_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    operator: 'equals',
+    action: 'exclude',
+    reason: 'Excluded by active registry rule',
+    status: 'active',
+    version: 1,
+    activated_by: 'reviewer-1',
+    activated_at: '2026-10-10T12:00:00.000Z',
+    review_due_at: null,
+    created_at: '2026-10-10T12:00:00.000Z',
+    updated_at: '2026-10-10T12:00:00.000Z',
+    ...overrides,
   };
 }
 
@@ -1152,6 +1199,213 @@ describe('transactional persistence', () => {
     if (second.ok) {
       assert.equal(second.revisionId, draft.id);
     }
+  });
+
+  it('remains compatible when no active path_video_rules exist', async () => {
+    const path = makePath({
+      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      owner: 'user-a',
+      goal: 'Pass the CKA',
+    });
+    const db = createMemoryResearchDb([path], {
+      pathVideoRules: [
+        makeActiveVideoRule({
+          id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+          rule_key: 'draft-only',
+          target_type: 'video',
+          value: 'aaaaaaaaaaa',
+          status: 'draft',
+          activated_by: null,
+          activated_at: null,
+        }),
+      ],
+    });
+    const result = await runPathResearch({
+      deps: makeDeps({ db }),
+      ownerId: 'user-a',
+      pathId: path.id,
+      idempotencyKey: 'no-active-rules-aaa',
+      accessToken: 'token',
+    });
+    assert.equal(result.ok, true);
+    const snapshot = db.jobs[0]?.input_snapshot.pathVideoRules as {
+      rulesVersion?: string;
+      excludedCandidates?: unknown[];
+    };
+    assert.equal(snapshot?.rulesVersion, 'none');
+    assert.deepEqual(snapshot?.excludedCandidates, []);
+    assert.equal(db.videos.length, 2);
+  });
+
+  it('excludes active video/creator rules before selection and records snapshot provenance', async () => {
+    const path = makePath({
+      id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      owner: 'user-a',
+      goal: 'Pass the CKA',
+    });
+    const activeVideoRule = makeActiveVideoRule({
+      id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      rule_key: 'exclude-video-aaaaaaaaaaa',
+      target_type: 'video',
+      value: 'aaaaaaaaaaa',
+    });
+    const activeCreatorRule = makeActiveVideoRule({
+      id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      rule_key: 'exclude-creator-blocked',
+      target_type: 'creator',
+      value: 'Blocked Channel',
+    });
+    const db = createMemoryResearchDb([path], {
+      pathVideoRules: [activeCreatorRule, activeVideoRule],
+    });
+
+    let observedSelectIds: string[] = [];
+    const result = await runPathResearch({
+      deps: makeDeps({
+        db,
+        youtube: createFakeYouTube({
+          catalog: new Map([
+            [
+              'kubernetes basics',
+              [
+                candidate('aaaaaaaaaaa'),
+                {
+                  ...candidate('bbbbbbbbbbb'),
+                  channelTitle: 'Blocked Channel',
+                },
+                candidate('xxxxxxxxx11'),
+              ],
+            ],
+            [
+              'kubernetes practice',
+              [candidate('ccccccccccc'), candidate('ddddddddddd')],
+            ],
+          ]),
+        }),
+        llm: createFakeLlm({
+          selectVideos: async (input) => {
+            observedSelectIds = [...input.candidatesByStage.values()]
+              .flat()
+              .map((item) => item.youtubeVideoId);
+            const stages: ResearchSelection['stages'] = [];
+            for (const [stageIndex, candidates] of input.candidatesByStage) {
+              if (candidates.length === 0) continue;
+              stages.push({
+                stageIndex,
+                videoIds: [candidates[0]!.youtubeVideoId],
+                reasons: ['Relevant verified candidate'],
+              });
+            }
+            return {
+              ok: true,
+              data: { stages },
+              latencyMs: 1,
+              usage: { totalTokens: 8 },
+            };
+          },
+        }),
+      }),
+      ownerId: 'user-a',
+      pathId: path.id,
+      idempotencyKey: 'active-rules-excl-1',
+      accessToken: 'token',
+    });
+
+    assert.equal(result.ok, true);
+    assert.ok(!observedSelectIds.includes('aaaaaaaaaaa'));
+    assert.ok(!observedSelectIds.includes('bbbbbbbbbbb'));
+    assert.ok(observedSelectIds.includes('xxxxxxxxx11'));
+
+    const jobSnapshot = db.jobs[0]?.input_snapshot.pathVideoRules as {
+      rulesVersion?: string;
+      promptConstraintVersion?: string;
+      excludedCandidates?: Array<{ youtubeVideoId: string; ruleKey: string }>;
+      rules?: Array<{ id: string; status?: string }>;
+    };
+    assert.ok(jobSnapshot?.rulesVersion);
+    assert.notEqual(jobSnapshot?.rulesVersion, 'none');
+    assert.equal(
+      jobSnapshot?.promptConstraintVersion,
+      'path-video-rules-prompt-v1'
+    );
+    assert.equal(jobSnapshot?.rules?.length, 2);
+    assert.ok(
+      jobSnapshot?.excludedCandidates?.some(
+        (item) => item.youtubeVideoId === 'aaaaaaaaaaa'
+      )
+    );
+    assert.ok(
+      jobSnapshot?.excludedCandidates?.some(
+        (item) => item.youtubeVideoId === 'bbbbbbbbbbb'
+      )
+    );
+
+    const revisionSnapshot = db.revisions[0]?.input_snapshot
+      .pathVideoRules as typeof jobSnapshot;
+    assert.deepEqual(revisionSnapshot?.rulesVersion, jobSnapshot?.rulesVersion);
+    assert.deepEqual(
+      revisionSnapshot?.excludedCandidates,
+      jobSnapshot?.excludedCandidates
+    );
+    assert.ok(
+      !db.videos.some((video) => video.youtube_video_id === 'aaaaaaaaaaa')
+    );
+    assert.ok(
+      !db.videos.some((video) => video.youtube_video_id === 'bbbbbbbbbbb')
+    );
+  });
+
+  it('post-selection guard blocks excluded candidates even if the model selects them', async () => {
+    const path = makePath({
+      id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      owner: 'user-a',
+      goal: 'Pass the CKA',
+    });
+    const db = createMemoryResearchDb([path], {
+      pathVideoRules: [
+        makeActiveVideoRule({
+          id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          rule_key: 'exclude-video-aaaaaaaaaaa',
+          target_type: 'video',
+          value: 'aaaaaaaaaaa',
+        }),
+      ],
+    });
+
+    const result = await runPathResearch({
+      deps: makeDeps({
+        db,
+        llm: createFakeLlm({
+          selectVideos: async () => ({
+            ok: true,
+            data: {
+              stages: [
+                {
+                  stageIndex: 0,
+                  videoIds: ['aaaaaaaaaaa'],
+                  reasons: ['Model ignored exclusions'],
+                },
+              ],
+            },
+            latencyMs: 1,
+          }),
+        }),
+      }),
+      ownerId: 'user-a',
+      pathId: path.id,
+      idempotencyKey: 'post-select-guard-1',
+      accessToken: 'token',
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(db.jobs[0]?.status, 'failed');
+    assert.equal(db.jobs[0]?.error?.code, 'invalid_selection');
+    assert.match(
+      String(db.jobs[0]?.error?.message || ''),
+      /excluded by an active path video rule/
+    );
+    assert.equal(db.revisions.length, 0);
+    assert.equal(db.videos.length, 0);
   });
 });
 

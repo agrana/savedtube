@@ -327,6 +327,246 @@ export type Database = {
           updated_at?: string;
         };
       };
+      path_video_dismissals: {
+        Row: {
+          id: string;
+          owner: string;
+          path_id: string;
+          path_video_id: string;
+          youtube_video_id: string;
+          reason:
+            | 'too_easy'
+            | 'too_hard'
+            | 'poor_quality'
+            | 'not_relevant'
+            | 'duplicate'
+            | 'outdated'
+            | 'wrong_language'
+            | 'already_known'
+            | 'other';
+          broader_feedback: boolean;
+          dismissed_at: string;
+          undismissed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner: string;
+          path_id: string;
+          path_video_id: string;
+          youtube_video_id: string;
+          reason:
+            | 'too_easy'
+            | 'too_hard'
+            | 'poor_quality'
+            | 'not_relevant'
+            | 'duplicate'
+            | 'outdated'
+            | 'wrong_language'
+            | 'already_known'
+            | 'other';
+          broader_feedback?: boolean;
+          dismissed_at?: string;
+          undismissed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          owner?: string;
+          path_id?: string;
+          path_video_id?: string;
+          youtube_video_id?: string;
+          reason?:
+            | 'too_easy'
+            | 'too_hard'
+            | 'poor_quality'
+            | 'not_relevant'
+            | 'duplicate'
+            | 'outdated'
+            | 'wrong_language'
+            | 'already_known'
+            | 'other';
+          broader_feedback?: boolean;
+          dismissed_at?: string;
+          undismissed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      path_video_dismissal_review_candidates: {
+        Row: {
+          id: string;
+          dismissal_id: string;
+          owner: string;
+          path_id: string;
+          path_video_id: string;
+          youtube_video_id: string;
+          reason:
+            | 'too_easy'
+            | 'too_hard'
+            | 'poor_quality'
+            | 'not_relevant'
+            | 'duplicate'
+            | 'outdated'
+            | 'wrong_language'
+            | 'already_known'
+            | 'other';
+          status:
+            | 'pending'
+            | 'assessing'
+            | 'approved'
+            | 'rejected'
+            | 'quarantined'
+            | 'retired';
+          supporting_evidence_count: number;
+          contradicting_evidence_count: number;
+          created_at: string;
+          updated_at: string;
+          assessed_at: string | null;
+          reviewer_id: string | null;
+          model_id: string | null;
+          prompt_version: string | null;
+          assessment_notes: string | null;
+        };
+        Insert: {
+          id?: string;
+          dismissal_id: string;
+          owner: string;
+          path_id: string;
+          path_video_id: string;
+          youtube_video_id: string;
+          reason:
+            | 'too_easy'
+            | 'too_hard'
+            | 'poor_quality'
+            | 'not_relevant'
+            | 'duplicate'
+            | 'outdated'
+            | 'wrong_language'
+            | 'already_known'
+            | 'other';
+          status?:
+            | 'pending'
+            | 'assessing'
+            | 'approved'
+            | 'rejected'
+            | 'quarantined'
+            | 'retired';
+          supporting_evidence_count?: number;
+          contradicting_evidence_count?: number;
+          created_at?: string;
+          updated_at?: string;
+          assessed_at?: string | null;
+          reviewer_id?: string | null;
+          model_id?: string | null;
+          prompt_version?: string | null;
+          assessment_notes?: string | null;
+        };
+        Update: {
+          id?: string;
+          dismissal_id?: string;
+          owner?: string;
+          path_id?: string;
+          path_video_id?: string;
+          youtube_video_id?: string;
+          reason?:
+            | 'too_easy'
+            | 'too_hard'
+            | 'poor_quality'
+            | 'not_relevant'
+            | 'duplicate'
+            | 'outdated'
+            | 'wrong_language'
+            | 'already_known'
+            | 'other';
+          status?:
+            | 'pending'
+            | 'assessing'
+            | 'approved'
+            | 'rejected'
+            | 'quarantined'
+            | 'retired';
+          supporting_evidence_count?: number;
+          contradicting_evidence_count?: number;
+          created_at?: string;
+          updated_at?: string;
+          assessed_at?: string | null;
+          reviewer_id?: string | null;
+          model_id?: string | null;
+          prompt_version?: string | null;
+          assessment_notes?: string | null;
+        };
+      };
+      path_video_rules: {
+        Row: {
+          id: string;
+          source_candidate_id: string;
+          rule_key: string;
+          target_type:
+            | 'video'
+            | 'creator'
+            | 'topic'
+            | 'language'
+            | 'difficulty';
+          operator: 'equals';
+          value: string;
+          action: 'exclude';
+          reason: string;
+          status: 'draft' | 'active' | 'suspended' | 'retired';
+          version: number;
+          activated_by: string | null;
+          activated_at: string | null;
+          review_due_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          source_candidate_id: string;
+          rule_key: string;
+          target_type:
+            | 'video'
+            | 'creator'
+            | 'topic'
+            | 'language'
+            | 'difficulty';
+          operator?: 'equals';
+          value: string;
+          action?: 'exclude';
+          reason: string;
+          status?: 'draft' | 'active' | 'suspended' | 'retired';
+          version?: number;
+          activated_by?: string | null;
+          activated_at?: string | null;
+          review_due_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          source_candidate_id?: string;
+          rule_key?: string;
+          target_type?:
+            | 'video'
+            | 'creator'
+            | 'topic'
+            | 'language'
+            | 'difficulty';
+          operator?: 'equals';
+          value?: string;
+          action?: 'exclude';
+          reason?: string;
+          status?: 'draft' | 'active' | 'suspended' | 'retired';
+          version?: number;
+          activated_by?: string | null;
+          activated_at?: string | null;
+          review_due_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       path_stage_progress: {
         Row: {
           id: string;

@@ -6,6 +6,7 @@
 export const API_AUTH_ERROR_CODE = {
   UNAUTHENTICATED: 'unauthenticated',
   YOUTUBE_REAUTH_REQUIRED: 'youtube_reauth_required',
+  REVIEWER_FORBIDDEN: 'reviewer_forbidden',
 } as const;
 
 export type ApiAuthErrorCode =
@@ -25,6 +26,8 @@ export const YOUTUBE_REAUTH_REQUIRED_MESSAGE =
   'Google YouTube authorization is missing or expired. Reconnect Google to continue research.';
 
 export const PATH_NOT_FOUND_MESSAGE = 'Path not found';
+
+export const REVIEWER_FORBIDDEN_MESSAGE = 'Reviewer access required.';
 
 export type ApiAuthErrorBody = {
   error: string;
@@ -47,6 +50,13 @@ export function buildYouTubeReauthErrorBody(): ApiAuthErrorBody {
   return {
     error: YOUTUBE_REAUTH_REQUIRED_MESSAGE,
     code: API_AUTH_ERROR_CODE.YOUTUBE_REAUTH_REQUIRED,
+  };
+}
+
+export function buildReviewerForbiddenErrorBody(): ApiAuthErrorBody {
+  return {
+    error: REVIEWER_FORBIDDEN_MESSAGE,
+    code: API_AUTH_ERROR_CODE.REVIEWER_FORBIDDEN,
   };
 }
 
