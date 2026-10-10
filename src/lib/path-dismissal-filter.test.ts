@@ -396,7 +396,7 @@ function createFilterDb(args?: {
 }
 
 describe('excludeActiveDismissedPathVideos', () => {
-  it('is a no-op when there are no active dismissals', () => {
+  it('returns a compact active sequence when there are no active dismissals', () => {
     const stages = sampleStages();
     const filtered = excludeActiveDismissedPathVideos(stages, new Set());
     assert.equal(filtered, stages);
@@ -406,7 +406,7 @@ describe('excludeActiveDismissedPathVideos', () => {
     );
   });
 
-  it('excludes only the dismissed path_video_id and preserves relative order', () => {
+  it('excludes only the dismissed path_video_id and reindexes the sequence', () => {
     const stages = sampleStages();
     const filtered = excludeActiveDismissedPathVideos(
       stages,
@@ -417,20 +417,17 @@ describe('excludeActiveDismissedPathVideos', () => {
       [VIDEO_A1, VIDEO_A3]
     );
     assert.equal(filtered[0]?.videos[0]?.position, 0);
-    assert.equal(filtered[0]?.videos[1]?.position, 2);
-    assert.equal(filtered[1]?.id, STAGE_EMPTY);
-    assert.deepEqual(filtered[1]?.videos, []);
+    assert.equal(filtered[0]?.videos[1]?.position, 1);
+    assert.equal(filtered.length, 1);
   });
 
-  it('keeps stages when every video is dismissed', () => {
+  it('removes empty stages when every video is dismissed', () => {
     const stages = sampleStages();
     const filtered = excludeActiveDismissedPathVideos(
       stages,
       new Set([VIDEO_A1, VIDEO_A2, VIDEO_A3])
     );
-    assert.equal(filtered.length, 2);
-    assert.deepEqual(filtered[0]?.videos, []);
-    assert.equal(filtered[1]?.id, STAGE_EMPTY);
+    assert.equal(filtered.length, 0);
     assert.equal(resolveContinueTarget(filtered, new Set()), null);
   });
 });
@@ -496,7 +493,7 @@ describe('loadActiveDismissedPathVideoIds', () => {
   });
 });
 
-describe('authenticated loader soft-dismiss filtering', () => {
+describe('authenticated path-content filtering', () => {
   it('path detail, map list, Continue, and watch order skip active dismissals', async () => {
     const db = createFilterDb({
       includePathB: true,
@@ -519,7 +516,7 @@ describe('authenticated loader soft-dismiss filtering', () => {
     );
     assert.equal(
       detail.stages.some((stage) => stage.id === STAGE_EMPTY),
-      true
+      false
     );
 
     const presentation = buildPathPresentation({

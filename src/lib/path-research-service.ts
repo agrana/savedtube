@@ -22,6 +22,7 @@ import {
   excludeActiveDismissedPathVideos,
   loadActiveDismissedPathVideoIds,
 } from './path-dismissal-filter';
+import { filterObviousPromotionalCandidates } from './path-content-policy';
 import type { PathRecord } from './paths';
 import { getOwnedPath, resolveOwnedPathAccess } from './paths';
 import {
@@ -1036,13 +1037,23 @@ export async function executeResearchPipeline(args: {
     );
   }
 
+  const marketingFiltered = filterObviousPromotionalCandidates(
+    searchResult.candidatesByStage
+  );
+  const marketingEmptyStages = [...marketingFiltered.candidatesByStage]
+    .filter(([, candidates]) => candidates.length === 0)
+    .map(([stageIndex]) => stageIndex);
   const filtered = filterResearchCandidatesByPathVideoRules({
-    candidatesByStage: searchResult.candidatesByStage,
+    candidatesByStage: marketingFiltered.candidatesByStage,
     rules: activeRulesResult.executableRules,
   });
   const candidatesByStage = filtered.candidatesByStage;
   const emptyStagesAfterRules = [
-    ...new Set([...searchResult.emptyStages, ...filtered.emptyStages]),
+    ...new Set([
+      ...searchResult.emptyStages,
+      ...marketingEmptyStages,
+      ...filtered.emptyStages,
+    ]),
   ].sort((a, b) => a - b);
 
   ruleSnapshot = buildPathVideoRuleResearchSnapshot({

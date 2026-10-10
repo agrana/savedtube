@@ -1,11 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { PathStageWithVideos } from './path-research-schema';
+import { inspectPromotionalCandidate } from './path-content-policy';
 
 /**
- * Deterministic soft-dismiss presentation filter for authenticated owners.
- * Excludes active (undismissed) path-video dismissals from path maps, ordered
- * lists, watch navigation, and Continue ordering without mutating membership,
- * progress, practice data, or revision edit_version.
+ * Deterministic path-content policy filter for authenticated owners.
+ * Excludes active path-video exclusions and obvious promotional videos from path
+ * maps, ordered lists, watch navigation, and Continue ordering without mutating
+ * shared video data. Remaining stages and videos are compacted.
  *
  * Preview and actual output should share {@link excludeActiveDismissedPathVideos}
  * so both apply the same path-scoped exclusion rules.
@@ -63,9 +64,9 @@ export async function loadActiveDismissedPathVideoIds(
 }
 
 /**
- * Remove actively dismissed videos from stages. Stages are preserved even when
- * every video is dismissed (empty videos array). Stage/video relative order of
- * remaining items is unchanged. Does not mutate the input arrays.
+ * Remove actively excluded videos and compact the active sequence. Empty stages
+ * disappear, while remaining stage and video positions are reindexed. Does not
+ * mutate the input arrays.
  */
 export function excludeActiveDismissedPathVideos(
   stages: PathStageWithVideos[],
@@ -75,12 +76,35 @@ export function excludeActiveDismissedPathVideos(
     return stages;
   }
 
-  return stages.map((stage) => ({
-    ...stage,
-    videos: stage.videos.filter(
-      (video) => !dismissedPathVideoIds.has(video.id)
-    ),
-  }));
+  const compacted: PathStageWithVideos[] = [];
+
+  for (const stage of stages) {
+    const videos = stage.videos
+      .filter((video) => {
+        if (dismissedPathVideoIds.has(video.id)) {
+          return false;
+        }
+        const snapshot = video.metadata_snapshot;
+        const descriptionExcerpt =
+          snapshot && typeof snapshot.descriptionExcerpt === 'string'
+            ? snapshot.descriptionExcerpt
+            : snapshot && typeof snapshot.description_excerpt === 'string'
+              ? snapshot.description_excerpt
+              : '';
+        return !inspectPromotionalCandidate({
+          title: video.title,
+          channelTitle: video.channel_title || '',
+          descriptionExcerpt,
+        }).promotional;
+      })
+      .map((video, position) => ({ ...video, position }));
+    if (videos.length === 0) {
+      continue;
+    }
+    compacted.push({ ...stage, position: compacted.length, videos });
+  }
+
+  return compacted;
 }
 
 /**

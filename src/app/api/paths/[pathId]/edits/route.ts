@@ -13,6 +13,7 @@ import { loadOwnedPathDetail } from '@/lib/path-research';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { createYouTubeDataClient } from '@/lib/youtube-data';
 import { config } from '@/lib/config';
+import { isObviousPromotionalCandidate } from '@/lib/path-content-policy';
 
 type RouteContext = {
   params: Promise<{ pathId: string }>;
@@ -98,6 +99,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
         );
       }
 
+      if (isObviousPromotionalCandidate(candidate)) {
+        return NextResponse.json(
+          {
+            error:
+              'This video appears to be promotional content and cannot be added to a learning path.',
+            code: 'promotional_content',
+          },
+          { status: 422 }
+        );
+      }
+
       verifiedVideo = {
         youtubeVideoId: candidate.youtubeVideoId,
         title: candidate.title,
@@ -108,6 +120,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         metadataSnapshot: {
           channelTitle: candidate.channelTitle,
           durationSeconds: candidate.durationSeconds,
+          descriptionExcerpt: candidate.descriptionExcerpt,
         },
       };
     }

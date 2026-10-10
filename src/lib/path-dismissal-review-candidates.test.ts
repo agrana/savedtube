@@ -738,7 +738,7 @@ describe('candidates do not affect path dismissal filters', () => {
       stages,
       after.pathVideoIds
     );
-    assert.equal(filtered[0]?.videos.length, 0);
+    assert.equal(filtered.length, 0);
 
     // Candidate rows alone never contribute dismissed ids.
     const dismissalOnlyIds = new Set(

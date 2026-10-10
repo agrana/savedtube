@@ -75,17 +75,17 @@ export default function PathDismissedVideosReview({
   return (
     <section
       className="mb-8 space-y-3"
-      aria-labelledby="dismissed-videos-heading"
+      aria-labelledby="excluded-videos-heading"
     >
       <h2
-        id="dismissed-videos-heading"
+        id="excluded-videos-heading"
         className="text-xl font-medium tracking-[-0.03em] text-stone-100"
       >
-        Hidden from this path
+        Excluded from this path
       </h2>
       <p className="text-sm text-stone-400">
-        These videos stay in the path. Restore one to show it in the map and
-        sequence again.
+        These videos are excluded from the active sequence. Restore one to add
+        it back and rebalance the path.
       </p>
       <ul className="space-y-2">
         {dismissals.map((item) => {

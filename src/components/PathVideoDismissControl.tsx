@@ -90,7 +90,7 @@ export default function PathVideoDismissControl({
         setError(
           typeof data.error === 'string' && data.error
             ? data.error
-            : 'Failed to remove this video from the path view'
+            : 'Failed to exclude this video from the path'
         );
         return;
       }
@@ -100,7 +100,7 @@ export default function PathVideoDismissControl({
       await onDismissed?.();
     } catch (err) {
       console.error('path video dismiss error:', err);
-      setError('Failed to remove this video from the path view');
+      setError('Failed to exclude this video from the path');
     } finally {
       setIsSubmitting(false);
     }
@@ -120,7 +120,7 @@ export default function PathVideoDismissControl({
         }}
         className="rounded-full border border-red-300/25 px-2.5 py-1 text-xs text-red-100 disabled:opacity-40"
       >
-        Dismiss
+        Exclude
       </button>
 
       {open && (
@@ -135,16 +135,16 @@ export default function PathVideoDismissControl({
             id={titleId}
             className="font-mono text-[0.65rem] uppercase tracking-[0.18em] text-stone-500"
           >
-            Dismiss from this path
+            Exclude from this path
           </p>
           <p className="mt-2 text-sm text-stone-300">
             {videoTitle
-              ? `Why hide “${videoTitle}”? It stays in the path for restore later.`
-              : 'Why hide this video? It stays in the path for restore later.'}
+              ? `Remove “${videoTitle}” and keep it out when this path is rebuilt.`
+              : 'Remove this video and keep it out when this path is rebuilt.'}
           </p>
 
           <fieldset className="mt-3 space-y-2" disabled={isSubmitting}>
-            <legend className="sr-only">Dismissal reason</legend>
+            <legend className="sr-only">Exclusion reason</legend>
             {PATH_VIDEO_DISMISSAL_REASON_OPTIONS.map((option) => (
               <label
                 key={option.reason}
@@ -187,7 +187,7 @@ export default function PathVideoDismissControl({
               onClick={() => void submit()}
               className="rounded-full border border-red-300/30 bg-red-300/10 px-3 py-1.5 text-xs text-red-50 disabled:opacity-40"
             >
-              {isSubmitting ? 'Removing…' : 'Confirm remove'}
+              {isSubmitting ? 'Excluding…' : 'Confirm exclude'}
             </button>
             <button
               type="button"
