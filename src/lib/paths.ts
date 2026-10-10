@@ -75,6 +75,10 @@ export type CreatePathInput = {
   goal: string;
   background: string | null;
   title?: string | null;
+  /** Cleaned learner-facing objective; defaults to wording-preserving goal. */
+  display_objective?: string | null;
+  /** Cleaned learner-facing path title; defaults from title/goal. */
+  display_path?: string | null;
 };
 export type UpdatePathInput = z.infer<typeof updatePathSchema>;
 export type PathListQuery = {
@@ -88,6 +92,8 @@ export type PathRecord = {
   goal: string;
   background: string | null;
   title: string;
+  display_objective: string;
+  display_path: string;
   active_revision_id?: string | null;
   created_at: string;
   updated_at: string;
@@ -100,6 +106,22 @@ export function derivePathTitle(goal: string, title?: string | null): string {
   }
   const trimmedGoal = goal.trim();
   return trimmedGoal.slice(0, PATH_TITLE_MAX_LENGTH);
+}
+
+/**
+ * Deterministic display metadata that preserves the learner's wording.
+ * Used when LLM cleanup is unavailable and as create/update defaults.
+ */
+export function fallbackPathDisplayFields(input: {
+  goal: string;
+  title?: string | null;
+}): { display_objective: string; display_path: string } {
+  const goal = input.goal.trim().slice(0, PATH_GOAL_MAX_LENGTH);
+  const display_path = derivePathTitle(goal, input.title);
+  return {
+    display_objective: goal.length > 0 ? goal : display_path,
+    display_path,
+  };
 }
 
 export function paginationRange(
@@ -248,7 +270,18 @@ export async function createOwnedPath(
   ownerId: string,
   input: CreatePathInput
 ): Promise<PathMutationResult> {
-  const title = derivePathTitle(input.goal, input.title);
+  const fallbackDisplay = fallbackPathDisplayFields({
+    goal: input.goal,
+    title: input.title,
+  });
+  const display_objective =
+    input.display_objective?.trim().slice(0, PATH_GOAL_MAX_LENGTH) ||
+    fallbackDisplay.display_objective;
+  const display_path =
+    input.display_path?.trim().slice(0, PATH_TITLE_MAX_LENGTH) ||
+    fallbackDisplay.display_path;
+  // Prefer cleaned path label for the stored title so existing title consumers stay aligned.
+  const title = display_path;
   const background =
     input.background && input.background.length > 0 ? input.background : null;
 
@@ -259,6 +292,8 @@ export async function createOwnedPath(
       goal: input.goal,
       background,
       title,
+      display_objective,
+      display_path,
     })
     .select('*')
     .single();
@@ -313,10 +348,16 @@ export async function updateOwnedPath(
     goal?: string;
     background?: string | null;
     title?: string;
+    display_objective?: string;
+    display_path?: string;
   } = {};
 
   if (input.goal !== undefined) {
     patch.goal = input.goal;
+    // Refresh display objective only when it still mirrors the previous raw goal.
+    if (existing.path.display_objective === existing.path.goal) {
+      patch.display_objective = input.goal;
+    }
   }
   if (input.background !== undefined) {
     patch.background =
@@ -324,10 +365,18 @@ export async function updateOwnedPath(
   }
   if (input.title !== undefined) {
     patch.title = input.title;
+    patch.display_path = input.title;
   } else if (input.goal !== undefined && input.title === undefined) {
     // Keep explicit titles; only refresh derived titles that still match the old goal.
     if (existing.path.title === derivePathTitle(existing.path.goal)) {
-      patch.title = derivePathTitle(input.goal);
+      const nextTitle = derivePathTitle(input.goal);
+      patch.title = nextTitle;
+      if (
+        existing.path.display_path === existing.path.title ||
+        existing.path.display_path === derivePathTitle(existing.path.goal)
+      ) {
+        patch.display_path = nextTitle;
+      }
     }
   }
 

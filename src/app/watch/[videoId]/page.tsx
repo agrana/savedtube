@@ -6,6 +6,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { YouTubePlayer, TimeInterval } from '../../../components/YouTubePlayer';
 import { IntervalManager } from '../../../components/IntervalManager';
+import PathVideoDismissControl from '@/components/PathVideoDismissControl';
 import type { IntervalSuggestionView } from '../../../components/IntervalManager';
 import { VideoInterval } from '../../../types/intervals';
 import type { PathWatchContext } from '@/lib/path-links';
@@ -678,9 +679,17 @@ export default function WatchPage() {
       : mode === 'playlist'
         ? currentIndex > 0
         : false;
+  const pathLessonOrdinal =
+    mode === 'path' && pathContext && pathContext.total > 0
+      ? pathContext.position + 1
+      : null;
+  const pathLessonTotal =
+    mode === 'path' && pathContext && pathContext.total > 0
+      ? pathContext.total
+      : null;
   const positionLabel =
-    mode === 'path' && pathContext
-      ? `${pathContext.position + 1} of ${pathContext.total}`
+    pathLessonOrdinal !== null && pathLessonTotal !== null
+      ? `${pathLessonOrdinal}/${pathLessonTotal}`
       : mode === 'playlist'
         ? `${currentIndex + 1} of ${playlistItems.length}`
         : null;
@@ -697,6 +706,39 @@ export default function WatchPage() {
       : mode === 'playlist'
         ? '← Playlist'
         : '← Paths';
+  const isPathWatch = mode === 'path' && pathContext !== null;
+  const pathNavButtonClassName =
+    'rounded-full border border-white/10 px-4 py-2 text-sm text-stone-200 transition hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#080806] disabled:cursor-not-allowed disabled:opacity-40';
+
+  const player = (
+    <YouTubePlayer
+      videoId={videoId}
+      autoPlay={autoplayEnabled}
+      intervals={sortedIntervals.map(
+        (interval): TimeInterval => ({
+          startTime: interval.startTime,
+          endTime: interval.endTime,
+        })
+      )}
+      loopEnabled={loopEnabled}
+      onEnd={() => {
+        // Playback end advances navigation only — never marks mastery.
+        if (hasNext && autoplayEnabled && intervals.length === 0) {
+          goToNext();
+        }
+      }}
+      onIntervalChange={(index) => {
+        const interval = sortedIntervals[index];
+        setActiveIntervalId(interval?.id ?? null);
+      }}
+      onCurrentTimeUpdate={setCurrentTime}
+      seekToSeconds={seekRequest?.time ?? null}
+      seekToToken={seekRequest?.token}
+      onSeekComplete={() => setSeekRequest(null)}
+      playThroughIntervals={playThrough !== null}
+      playThroughStartIndex={playThrough?.startIndex ?? 0}
+    />
+  );
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#080806] text-stone-100">
@@ -708,36 +750,47 @@ export default function WatchPage() {
           <div className="flex min-w-0 items-center gap-4">
             <Link
               href={backHref}
-              className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-2 text-sm font-medium text-stone-300 transition hover:bg-white/[0.06] hover:text-stone-50"
+              className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-2 text-sm font-medium text-stone-300 transition hover:bg-white/[0.06] hover:text-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#080806]"
             >
               {backLabel}
             </Link>
-            <div className="min-w-0">
-              <h1 className="max-w-[42vw] truncate text-base font-medium tracking-[-0.02em] text-stone-50 sm:text-lg">
-                {displayTitle}
-              </h1>
-              <p className="truncate text-sm text-stone-400">
-                {displayChannel}
-                {pathContext ? ` · ${pathContext.stageTitle}` : ''}
+            {isPathWatch ? (
+              <p className="min-w-0 truncate font-mono text-[10px] uppercase tracking-[0.2em] text-amber-100/70">
+                {pathContext.pathTitle}
               </p>
-            </div>
+            ) : (
+              <div className="min-w-0">
+                <h1 className="max-w-[42vw] truncate text-base font-medium tracking-[-0.02em] text-stone-50 sm:text-lg">
+                  {displayTitle}
+                </h1>
+                <p className="truncate text-sm text-stone-400">
+                  {displayChannel}
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3 sm:gap-4">
-            {mode === 'path' &&
-              pathContext &&
-              session &&
-              !isPublicDemoWatch && (
+            {isPathWatch && session && !isPublicDemoWatch && (
+              <>
                 <button
                   type="button"
                   onClick={() => void markPracticed(!pathContext.practiced)}
                   disabled={isMarkingPracticed}
-                  className="rounded-full border border-amber-200/25 bg-amber-300/10 px-3 py-2 text-xs font-medium text-amber-50 transition hover:bg-amber-300/15 disabled:opacity-60"
+                  className="rounded-full border border-amber-200/25 bg-amber-300/10 px-3 py-2 text-xs font-medium text-amber-50 transition hover:bg-amber-300/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#080806] disabled:opacity-60"
                 >
                   {pathContext.practiced ? 'Practiced' : 'Mark practiced'}
                 </button>
-              )}
-            {positionLabel && (
+                <PathVideoDismissControl
+                  pathId={pathId as string}
+                  pathVideoId={pathVideoId as string}
+                  youtubeVideoId={videoId}
+                  videoTitle={displayTitle}
+                  onDismissed={() => router.push(pathContext.returnHref)}
+                />
+              </>
+            )}
+            {!isPathWatch && positionLabel && (
               <span className="hidden font-mono text-xs uppercase tracking-[0.18em] text-amber-100/60 sm:inline">
                 {positionLabel}
               </span>
@@ -747,7 +800,7 @@ export default function WatchPage() {
               role="switch"
               aria-checked={autoplayEnabled}
               onClick={() => setAutoplayEnabled((prev) => !prev)}
-              className="flex items-center gap-2 text-xs text-stone-300 transition hover:text-stone-50 sm:text-sm"
+              className="flex items-center gap-2 text-xs text-stone-300 transition hover:text-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#080806] sm:text-sm"
               title="Toggle autoplay"
             >
               <span className="hidden sm:inline">Autoplay</span>
@@ -772,102 +825,139 @@ export default function WatchPage() {
         </div>
       </div>
 
-      <div className="relative z-0 flex min-h-screen items-center justify-center px-5 py-28 sm:px-8">
-        <div className="w-full max-w-6xl overflow-hidden rounded-[2rem] border border-white/10 bg-[#10100d]/90 p-2 shadow-2xl shadow-black/50">
-          <YouTubePlayer
-            videoId={videoId}
-            autoPlay={autoplayEnabled}
-            intervals={sortedIntervals.map(
-              (interval): TimeInterval => ({
-                startTime: interval.startTime,
-                endTime: interval.endTime,
-              })
-            )}
-            loopEnabled={loopEnabled}
-            onEnd={() => {
-              // Playback end advances navigation only — never marks mastery.
-              if (hasNext && autoplayEnabled && intervals.length === 0) {
-                goToNext();
-              }
-            }}
-            onIntervalChange={(index) => {
-              const interval = sortedIntervals[index];
-              setActiveIntervalId(interval?.id ?? null);
-            }}
-            onCurrentTimeUpdate={setCurrentTime}
-            seekToSeconds={seekRequest?.time ?? null}
-            seekToToken={seekRequest?.token}
-            onSeekComplete={() => setSeekRequest(null)}
-            playThroughIntervals={playThrough !== null}
-            playThroughStartIndex={playThrough?.startIndex ?? 0}
-          />
-        </div>
-      </div>
-
-      {(mode === 'playlist' || mode === 'path') && (
-        <div className="absolute bottom-8 left-1/2 z-10 -translate-x-1/2 transform">
-          <div className="flex items-center gap-4 rounded-full border border-white/10 bg-[#10100d]/85 px-5 py-3 shadow-2xl shadow-black/40 backdrop-blur-xl">
-            <button
-              onClick={goToPrevious}
-              disabled={!hasPrevious}
-              className={`rounded-full p-2 transition ${
-                hasPrevious
-                  ? 'text-stone-100 hover:bg-white hover:text-stone-950'
-                  : 'cursor-not-allowed text-stone-600'
-              }`}
-              title="Previous video"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-            </button>
-
-            <div className="font-mono text-sm text-stone-300">
-              {positionLabel}
+      {isPathWatch ? (
+        <div className="relative z-0 mx-auto w-full max-w-4xl px-5 pb-24 pt-28 sm:px-8">
+          <div className="space-y-5">
+            <div className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#10100d] shadow-2xl shadow-black/40">
+              {player}
             </div>
 
-            <button
-              onClick={goToNext}
-              disabled={!hasNext}
-              className={`rounded-full p-2 transition ${
-                hasNext
-                  ? 'text-stone-100 hover:bg-white hover:text-stone-950'
-                  : 'cursor-not-allowed text-stone-600'
-              }`}
-              title="Next video"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
-            </button>
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] px-5 py-5 sm:px-6">
+              <div className="flex items-start justify-between gap-4">
+                <p className="min-w-0 font-mono text-[10px] uppercase tracking-[0.2em] text-amber-100/70">
+                  {pathContext.pathTitle}
+                </p>
+                {pathLessonOrdinal !== null && pathLessonTotal !== null ? (
+                  <p
+                    className="shrink-0 font-mono text-[10px] uppercase tracking-[0.2em] text-stone-500"
+                    aria-label={`Lesson ${pathLessonOrdinal} of ${pathLessonTotal}`}
+                  >
+                    {pathLessonOrdinal}/{pathLessonTotal}
+                  </p>
+                ) : null}
+              </div>
+              <h1 className="mt-3 text-lg font-medium leading-snug tracking-[-0.02em] text-stone-50 sm:text-xl">
+                {displayTitle}
+              </h1>
+              <p className="mt-1.5 text-sm text-stone-500">{displayChannel}</p>
+              {pathContext.stageTitle ? (
+                <p className="mt-4 max-w-prose text-sm leading-6 text-stone-400">
+                  <span className="text-stone-300">
+                    {pathContext.stageTitle}
+                  </span>
+                </p>
+              ) : null}
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  disabled={!hasPrevious}
+                  onClick={goToPrevious}
+                  className={pathNavButtonClassName}
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  disabled={!hasNext}
+                  onClick={goToNext}
+                  className={pathNavButtonClassName}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+
+            {!isPublicDemoWatch ? (
+              <p className="text-xs text-stone-500">
+                Practice loops on this video are shared across paths.
+              </p>
+            ) : null}
           </div>
         </div>
+      ) : (
+        <>
+          <div className="relative z-0 flex min-h-screen items-center justify-center px-5 py-28 sm:px-8">
+            <div className="w-full max-w-6xl overflow-hidden rounded-[2rem] border border-white/10 bg-[#10100d]/90 p-2 shadow-2xl shadow-black/50">
+              {player}
+            </div>
+          </div>
+
+          {mode === 'playlist' && (
+            <div className="absolute bottom-8 left-1/2 z-10 -translate-x-1/2 transform">
+              <div className="flex items-center gap-4 rounded-full border border-white/10 bg-[#10100d]/85 px-5 py-3 shadow-2xl shadow-black/40 backdrop-blur-xl">
+                <button
+                  onClick={goToPrevious}
+                  disabled={!hasPrevious}
+                  className={`rounded-full p-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#080806] ${
+                    hasPrevious
+                      ? 'text-stone-100 hover:bg-white hover:text-stone-950'
+                      : 'cursor-not-allowed text-stone-600'
+                  }`}
+                  title="Previous video"
+                >
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 19l-7-7 7-7"
+                    />
+                  </svg>
+                </button>
+
+                <div className="font-mono text-sm text-stone-300">
+                  {positionLabel}
+                </div>
+
+                <button
+                  onClick={goToNext}
+                  disabled={!hasNext}
+                  className={`rounded-full p-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#080806] ${
+                    hasNext
+                      ? 'text-stone-100 hover:bg-white hover:text-stone-950'
+                      : 'cursor-not-allowed text-stone-600'
+                  }`}
+                  title="Next video"
+                >
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {!isPublicDemoWatch && (
         <button
           onClick={() => setShowIntervalPanel(!showIntervalPanel)}
-          className="fixed right-5 top-24 z-30 rounded-full border border-amber-200/25 bg-amber-300/15 p-3 text-amber-100 shadow-2xl shadow-black/40 transition hover:bg-amber-300/20"
+          className="fixed right-5 top-24 z-30 rounded-full border border-amber-200/25 bg-amber-300/15 p-3 text-amber-100 shadow-2xl shadow-black/40 transition hover:bg-amber-300/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#080806]"
           title="Manage time intervals"
         >
           <svg
@@ -884,12 +974,6 @@ export default function WatchPage() {
             />
           </svg>
         </button>
-      )}
-
-      {mode === 'path' && !isPublicDemoWatch && (
-        <p className="fixed bottom-28 left-5 z-20 max-w-xs text-xs text-stone-500 sm:left-8">
-          Practice loops on this video are shared across paths.
-        </p>
       )}
 
       {!isPublicDemoWatch && (

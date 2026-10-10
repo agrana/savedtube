@@ -29,7 +29,7 @@ jobs:
           version: latest
 
       - name: Start local Supabase database
-        run: supabase start -x studio,api,imgproxy,storage-api,realtime,edge-runtime,logflare,vector,inbucket
+        run: supabase start -x studio,imgproxy,storage-api,realtime,edge-runtime,logflare,vector,mailpit
 
       - name: Reset local DB and apply migrations
         run: supabase db reset

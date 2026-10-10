@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireApiSession } from '@/lib/api-auth';
+import { resolveConfiguredPathDisplayMetadata } from '@/lib/path-display-cleanup-runtime';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import {
   createOwnedPath,
@@ -66,12 +67,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Owner is always derived from the session — never from the client body.
+    // Clean display metadata at create time; raw goal/background stay for research.
+    const display = await resolveConfiguredPathDisplayMetadata({
+      goal: validation.data.goal,
+      background: validation.data.background,
+      title: validation.data.title,
+    });
+
     const supabase = createServerSupabaseClient();
-    const result = await createOwnedPath(
-      supabase,
-      auth.session.user.id,
-      validation.data
-    );
+    const result = await createOwnedPath(supabase, auth.session.user.id, {
+      ...validation.data,
+      display_objective: display.display_objective,
+      display_path: display.display_path,
+    });
 
     if (!result.ok) {
       return NextResponse.json(

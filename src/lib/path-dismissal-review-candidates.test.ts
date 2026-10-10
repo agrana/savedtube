@@ -182,6 +182,8 @@ function createCandidateDb(args?: {
       goal: 'Learn soft dismiss',
       background: null,
       title: derivePathTitle('Learn soft dismiss'),
+      display_objective: 'Learn soft dismiss',
+      display_path: derivePathTitle('Learn soft dismiss'),
       active_revision_id: REVISION_ID,
       created_at: '2026-10-10T12:00:00.000Z',
       updated_at: '2026-10-10T12:00:00.000Z',

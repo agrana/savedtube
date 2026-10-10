@@ -23,6 +23,13 @@ import {
   parseDismissalAssessmentOutput,
   type DismissalAssessmentLlm,
 } from './path-dismissal-assessment';
+import {
+  PATH_DISPLAY_CLEANUP_SYSTEM_PROMPT,
+  buildPathDisplayCleanupUserPayload,
+  parsePathDisplayCleanupOutput,
+  sanitizePathDisplayCleanupOutput,
+  type PathDisplayCleanupLlm,
+} from './path-display-cleanup';
 import type { PathVideoRulePromptConstraints } from './path-video-rule-research';
 
 export type LlmUsage = {
@@ -531,6 +538,63 @@ export function createOpenAiCompatibleDismissalAssessmentProvider(
       return {
         ok: true,
         data: parsed.data,
+        usage: result.usage,
+        latencyMs: result.latencyMs,
+      };
+    },
+  };
+}
+
+export function createOpenAiCompatiblePathDisplayCleanupProvider(
+  config: OpenAiCompatibleConfig
+): PathDisplayCleanupLlm {
+  return {
+    provider: config.provider,
+    model: config.model,
+    async cleanDisplay(input) {
+      const result = await chatJsonCompletion({
+        config,
+        system: PATH_DISPLAY_CLEANUP_SYSTEM_PROMPT,
+        user: buildPathDisplayCleanupUserPayload({
+          goal: input.goal,
+          background: input.background,
+          title: input.title,
+        }),
+        timeoutMs: input.timeoutMs,
+        signal: input.signal,
+      });
+
+      if (!result.ok) {
+        return result;
+      }
+
+      const parsed = parsePathDisplayCleanupOutput(result.content);
+      if (!parsed.success) {
+        return {
+          ok: false,
+          code: 'model_schema_invalid',
+          message: parsed.error,
+          latencyMs: result.latencyMs,
+        };
+      }
+
+      const sanitized = sanitizePathDisplayCleanupOutput(parsed.data, {
+        goal: input.goal,
+        background: input.background,
+        title: input.title,
+      });
+      if (!sanitized) {
+        return {
+          ok: false,
+          code: 'model_content_rejected',
+          message: 'Display cleanup drifted too far from the learner prompt',
+          latencyMs: result.latencyMs,
+        };
+      }
+
+      return {
+        ok: true,
+        data: sanitized,
         usage: result.usage,
         latencyMs: result.latencyMs,
       };

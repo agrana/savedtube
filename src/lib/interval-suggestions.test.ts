@@ -32,6 +32,8 @@ function makePath(): PathRecord {
     goal: 'Throw consistent darts',
     background: null,
     title: derivePathTitle('Throw consistent darts'),
+    display_objective: 'Throw consistent darts',
+    display_path: derivePathTitle('Throw consistent darts'),
     active_revision_id: REVISION_ID,
     created_at: '2026-09-26T12:00:00.000Z',
     updated_at: '2026-09-26T12:00:00.000Z',

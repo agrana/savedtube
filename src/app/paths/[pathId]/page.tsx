@@ -560,24 +560,16 @@ export default function PathDetailPage() {
                 Learning path
               </p>
               <h1 className="mt-4 text-4xl font-medium leading-[0.95] tracking-[-0.055em] text-stone-50 sm:text-5xl">
-                {pageState.path.title}
+                {pageState.path.display_path || pageState.path.title}
               </h1>
 
               <div className="mt-8 space-y-5 rounded-[1.5rem] border border-white/10 bg-[#10100d]/90 p-5 sm:p-6">
                 <div>
-                  <h2 className="text-sm font-medium text-stone-300">Goal</h2>
-                  <p className="mt-2 whitespace-pre-wrap text-stone-100">
-                    {pageState.path.goal}
-                  </p>
-                </div>
-                <div>
                   <h2 className="text-sm font-medium text-stone-300">
-                    Background
+                    Objective
                   </h2>
-                  <p className="mt-2 whitespace-pre-wrap text-stone-400">
-                    {pageState.path.background?.trim()
-                      ? pageState.path.background
-                      : 'No background provided.'}
+                  <p className="mt-2 whitespace-pre-wrap text-stone-100">
+                    {pageState.path.display_objective}
                   </p>
                 </div>
                 {pageState.progress && pageState.progress.totalVideos > 0 && (
@@ -756,8 +748,8 @@ export default function PathDetailPage() {
               </div>
               <PathMap
                 pathId={pathId}
-                pathTitle={pageState.path.title}
-                goal={pageState.path.goal}
+                pathTitle={pageState.path.display_path || pageState.path.title}
+                goal={pageState.path.display_objective}
                 stages={pageState.stages}
                 practicedVideoIds={pageState.progress?.practicedVideoIds || []}
                 completedStageIds={pageState.progress?.completedStageIds || []}
