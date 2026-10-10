@@ -167,6 +167,17 @@ export default function DemoPathLanding() {
   const next = selectedVideo
     ? adjacentDemoVideo(fixture, selectedVideo.id, 'next')
     : null;
+  const playableVideos = getPlayableDemoVideos(fixture);
+  const selectedLessonIndex = selectedVideo
+    ? playableVideos.findIndex((video) => video.id === selectedVideo.id)
+    : -1;
+  const selectedStage = selectedVideo
+    ? (fixture.stages.find((stage) => stage.id === selectedVideo.stageId) ??
+      null)
+    : null;
+  const lessonOrdinal =
+    selectedLessonIndex >= 0 ? selectedLessonIndex + 1 : null;
+  const lessonTotal = playableVideos.length;
 
   return (
     <section
@@ -197,7 +208,7 @@ export default function DemoPathLanding() {
       </div>
 
       <div className="mt-14 grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-        <div id="demo-player" className="space-y-4">
+        <div id="demo-player" className="space-y-5">
           <div className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#10100d] shadow-2xl shadow-black/40">
             {selectedVideo ? (
               <YouTubePlayer
@@ -215,22 +226,40 @@ export default function DemoPathLanding() {
           </div>
 
           {selectedVideo ? (
-            <div className="rounded-[1.25rem] border border-white/10 bg-white/[0.03] px-4 py-4">
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-amber-100/70">
-                Now playing
-              </p>
-              <h2 className="mt-2 text-lg font-medium text-stone-50">
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] px-5 py-5 sm:px-6">
+              <div className="flex items-start justify-between gap-4">
+                <p className="min-w-0 font-mono text-[10px] uppercase tracking-[0.2em] text-amber-100/70">
+                  {fixture.pathTitle}
+                </p>
+                {lessonOrdinal !== null && lessonTotal > 0 ? (
+                  <p
+                    className="shrink-0 font-mono text-[10px] uppercase tracking-[0.2em] text-stone-500"
+                    aria-label={`Lesson ${lessonOrdinal} of ${lessonTotal}`}
+                  >
+                    {lessonOrdinal}/{lessonTotal}
+                  </p>
+                ) : null}
+              </div>
+              <h2 className="mt-3 text-lg font-medium leading-snug tracking-[-0.02em] text-stone-50 sm:text-xl">
                 {selectedVideo.title}
               </h2>
-              <p className="mt-1 text-sm text-stone-500">
+              <p className="mt-1.5 text-sm text-stone-500">
                 {selectedVideo.channelTitle}
               </p>
-              <div className="mt-4 flex flex-wrap gap-3">
+              {selectedStage ? (
+                <p className="mt-4 max-w-prose text-sm leading-6 text-stone-400">
+                  <span className="text-stone-300">
+                    Stage {selectedStage.position + 1}: {selectedStage.title}.
+                  </span>{' '}
+                  {selectedStage.learningObjective}
+                </p>
+              ) : null}
+              <div className="mt-5 flex flex-wrap gap-3">
                 <button
                   type="button"
                   disabled={!previous}
                   onClick={() => previous && handleSelect(previous.id)}
-                  className="rounded-full border border-white/10 px-4 py-2 text-sm text-stone-200 transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-full border border-white/10 px-4 py-2 text-sm text-stone-200 transition hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#080806] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Previous
                 </button>
@@ -238,7 +267,7 @@ export default function DemoPathLanding() {
                   type="button"
                   disabled={!next}
                   onClick={() => next && handleSelect(next.id)}
-                  className="rounded-full border border-white/10 px-4 py-2 text-sm text-stone-200 transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-full border border-white/10 px-4 py-2 text-sm text-stone-200 transition hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#080806] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Next
                 </button>
