@@ -132,10 +132,20 @@ function createSuggestionDb(args?: {
 
   function matches(
     row: Record<string, unknown>,
-    filters: Array<{ column: string; value: unknown; mode: 'eq' | 'in' }>
+    filters: Array<{
+      column: string;
+      value: unknown;
+      mode: 'eq' | 'in' | 'is';
+    }>
   ) {
     return filters.every((filter) => {
       if (filter.mode === 'eq') {
+        return row[filter.column] === filter.value;
+      }
+      if (filter.mode === 'is') {
+        if (filter.value === null) {
+          return row[filter.column] == null;
+        }
         return row[filter.column] === filter.value;
       }
       return (filter.value as unknown[]).includes(row[filter.column]);
@@ -158,6 +168,8 @@ function createSuggestionDb(args?: {
         return suggestions as unknown as Record<string, unknown>[];
       case 'video_intervals':
         return intervals as unknown as Record<string, unknown>[];
+      case 'path_video_dismissals':
+        return [];
       default:
         throw new Error(`Unexpected table ${table}`);
     }
@@ -165,7 +177,11 @@ function createSuggestionDb(args?: {
 
   function from(table: string) {
     const state: {
-      filters: Array<{ column: string; value: unknown; mode: 'eq' | 'in' }>;
+      filters: Array<{
+        column: string;
+        value: unknown;
+        mode: 'eq' | 'in' | 'is';
+      }>;
       orderColumn?: string;
       ascending: boolean;
       mode: 'select' | 'insert' | 'update' | 'delete';
@@ -327,6 +343,10 @@ function createSuggestionDb(args?: {
       },
       in(column: string, value: unknown[]) {
         state.filters.push({ column, value, mode: 'in' });
+        return builder;
+      },
+      is(column: string, value: unknown) {
+        state.filters.push({ column, value, mode: 'is' });
         return builder;
       },
       order(column: string, options: { ascending: boolean }) {

@@ -9,6 +9,10 @@ import {
   buildYouTubeReauthErrorBody,
   sessionMissingYouTubeAccessToken,
 } from './api-auth-errors';
+import {
+  evaluateApiReviewerAccess,
+  SAVEDTUBE_REVIEWER_IDS_ENV_NAME,
+} from './api-reviewer-auth';
 
 export type ApiSession = Session & {
   user: Session['user'] & { id: string };
@@ -62,4 +66,32 @@ export async function requireApiSessionWithAccessToken(): Promise<
   return {
     session: result.session as ApiSession & { accessToken: string },
   };
+}
+
+/**
+ * Authenticated API session plus fail-closed reviewer allowlist check.
+ * Uses SAVEDTUBE_REVIEWER_IDS (comma-separated user IDs). Missing/empty
+ * allowlist or non-member users receive JSON 403.
+ */
+export async function requireApiReviewerSession(): Promise<
+  | { session: ApiSession; error?: undefined }
+  | { session?: undefined; error: NextResponse }
+> {
+  const result = await requireApiSession();
+  if (result.error) {
+    return result;
+  }
+
+  const decision = evaluateApiReviewerAccess({
+    userId: result.session.user.id,
+    reviewerIdsEnv: process.env[SAVEDTUBE_REVIEWER_IDS_ENV_NAME],
+  });
+
+  if (!decision.authorized) {
+    return {
+      error: NextResponse.json(decision.body, { status: decision.status }),
+    };
+  }
+
+  return { session: result.session };
 }
