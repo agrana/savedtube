@@ -787,9 +787,16 @@ export default function PathDetailPage() {
             ) : (
               <section className="space-y-4">
                 <div className="flex flex-wrap items-end justify-between gap-3">
-                  <h2 className="text-xl font-medium tracking-[-0.03em] text-stone-100">
-                    Edit sequence
-                  </h2>
+                  <div>
+                    <h2 className="text-xl font-medium tracking-[-0.03em] text-stone-100">
+                      Edit sequence
+                    </h2>
+                    <p className="mt-1 max-w-2xl text-sm text-stone-500">
+                      Use <span className="text-stone-300">Dismiss</span> on a
+                      video to hide it from this path while keeping it available
+                      to restore later.
+                    </p>
+                  </div>
                 </div>
                 <ol className="space-y-4">
                   {pageState.stages.map((stage, stageIndex) => {

@@ -120,7 +120,7 @@ export default function PathVideoDismissControl({
         }}
         className="rounded-full border border-red-300/25 px-2.5 py-1 text-xs text-red-100 disabled:opacity-40"
       >
-        Remove
+        Dismiss
       </button>
 
       {open && (
@@ -135,7 +135,7 @@ export default function PathVideoDismissControl({
             id={titleId}
             className="font-mono text-[0.65rem] uppercase tracking-[0.18em] text-stone-500"
           >
-            Remove from this path
+            Dismiss from this path
           </p>
           <p className="mt-2 text-sm text-stone-300">
             {videoTitle
