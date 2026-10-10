@@ -147,6 +147,25 @@ describe('path-detail dismissal UI wiring (source)', () => {
     assert.match(source, /mark_practiced/);
   });
 
+  it('watch screen exposes dismissal beside path practice controls', () => {
+    const source = readFileSync(
+      join(root, 'src/app/watch/[videoId]/page.tsx'),
+      'utf8'
+    );
+    assert.match(
+      source,
+      /import PathVideoDismissControl from '@\/components\/PathVideoDismissControl'/
+    );
+    assert.match(source, /<PathVideoDismissControl/);
+    assert.match(source, /pathId=\{pathId as string\}/);
+    assert.match(source, /pathVideoId=\{pathVideoId as string\}/);
+    assert.match(source, /youtubeVideoId=\{videoId\}/);
+    assert.match(
+      source,
+      /onDismissed=\{\(\) => router\.push\(pathContext\.returnHref\)\}/
+    );
+  });
+
   it('path detail loads dismissed review and restores via DELETE', () => {
     const pageSource = readFileSync(
       join(root, 'src/app/paths/[pathId]/page.tsx'),

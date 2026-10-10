@@ -6,6 +6,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { YouTubePlayer, TimeInterval } from '../../../components/YouTubePlayer';
 import { IntervalManager } from '../../../components/IntervalManager';
+import PathVideoDismissControl from '@/components/PathVideoDismissControl';
 import type { IntervalSuggestionView } from '../../../components/IntervalManager';
 import { VideoInterval } from '../../../types/intervals';
 import type { PathWatchContext } from '@/lib/path-links';
@@ -771,14 +772,23 @@ export default function WatchPage() {
 
           <div className="flex items-center gap-3 sm:gap-4">
             {isPathWatch && session && !isPublicDemoWatch && (
-              <button
-                type="button"
-                onClick={() => void markPracticed(!pathContext.practiced)}
-                disabled={isMarkingPracticed}
-                className="rounded-full border border-amber-200/25 bg-amber-300/10 px-3 py-2 text-xs font-medium text-amber-50 transition hover:bg-amber-300/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#080806] disabled:opacity-60"
-              >
-                {pathContext.practiced ? 'Practiced' : 'Mark practiced'}
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => void markPracticed(!pathContext.practiced)}
+                  disabled={isMarkingPracticed}
+                  className="rounded-full border border-amber-200/25 bg-amber-300/10 px-3 py-2 text-xs font-medium text-amber-50 transition hover:bg-amber-300/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#080806] disabled:opacity-60"
+                >
+                  {pathContext.practiced ? 'Practiced' : 'Mark practiced'}
+                </button>
+                <PathVideoDismissControl
+                  pathId={pathId as string}
+                  pathVideoId={pathVideoId as string}
+                  youtubeVideoId={videoId}
+                  videoTitle={displayTitle}
+                  onDismissed={() => router.push(pathContext.returnHref)}
+                />
+              </>
             )}
             {!isPathWatch && positionLabel && (
               <span className="hidden font-mono text-xs uppercase tracking-[0.18em] text-amber-100/60 sm:inline">
