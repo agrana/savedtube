@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -93,6 +93,17 @@ const readResumePosition = (videoId: string): number | null => {
   return Number.isFinite(value) && value > 3 ? value : null;
 };
 
+const saveResumePosition = (videoId: string, time: number) => {
+  if (typeof window === 'undefined' || !Number.isFinite(time) || time <= 3) {
+    return;
+  }
+
+  window.localStorage.setItem(
+    getResumePositionKey(videoId),
+    String(Math.floor(time))
+  );
+};
+
 function pathWatchHref(
   youtubeVideoId: string,
   pathId: string,
@@ -126,6 +137,7 @@ export default function WatchPage() {
   const [loopEnabled, setLoopEnabled] = useState(false);
   const [showIntervalPanel, setShowIntervalPanel] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const currentTimeRef = useRef(0);
   const [resumeRequest, setResumeRequest] = useState<{
     time: number;
     token: number;
@@ -531,13 +543,34 @@ export default function WatchPage() {
     );
   }, [videoId]);
 
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
+
+  // Remember where the viewer actually left the video. The interval keeps the
+  // position durable during route changes, tab closes, and browser crashes;
+  // the cleanup/pagehide handlers cover the final few seconds.
+  useEffect(() => {
+    if (mode !== 'path' || typeof window === 'undefined') return;
+
+    const persistPosition = () => {
+      saveResumePosition(videoId, currentTimeRef.current);
+    };
+
+    const persistenceTimer = window.setInterval(persistPosition, 2000);
+    window.addEventListener('pagehide', persistPosition);
+
+    return () => {
+      persistPosition();
+      window.clearInterval(persistenceTimer);
+      window.removeEventListener('pagehide', persistPosition);
+    };
+  }, [mode, videoId]);
+
   const saveStartPosition = () => {
-    if (typeof window === 'undefined' || currentTime <= 3) return;
+    if (currentTime <= 3) return;
     const position = Math.floor(currentTime);
-    window.localStorage.setItem(
-      getResumePositionKey(videoId),
-      String(position)
-    );
+    saveResumePosition(videoId, position);
     setResumeRequest({ time: position, token: Date.now() });
   };
 
