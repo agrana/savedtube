@@ -79,6 +79,7 @@ interface YouTubePlayerProps {
   onCurrentTimeUpdate?: (currentTime: number) => void;
   seekToSeconds?: number | null;
   seekToToken?: number;
+  playAfterSeek?: boolean;
   onSeekComplete?: () => void;
   playThroughIntervals?: boolean;
   playThroughStartIndex?: number;
@@ -97,6 +98,7 @@ export function YouTubePlayer({
   onCurrentTimeUpdate,
   seekToSeconds = null,
   seekToToken,
+  playAfterSeek = true,
   onSeekComplete,
   playThroughIntervals = false,
   playThroughStartIndex = 0,
@@ -238,7 +240,9 @@ export function YouTubePlayer({
     if (seekToSeconds === null || typeof seekToSeconds === 'undefined') return;
 
     playerRef.current.seekTo(seekToSeconds, true);
-    playerRef.current.playVideo();
+    if (playAfterSeek) {
+      playerRef.current.playVideo();
+    }
 
     // An explicit interval click seeks the player; start the play-through
     // sequence from the clicked interval so subsequent intervals follow.
@@ -251,6 +255,7 @@ export function YouTubePlayer({
     isPlayerReady,
     seekToSeconds,
     seekToToken,
+    playAfterSeek,
     onSeekComplete,
     playThroughIntervals,
     playThroughStartIndex,

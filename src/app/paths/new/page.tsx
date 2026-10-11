@@ -196,6 +196,20 @@ export default function NewPathPage() {
             Save your goal, then research a bounded sequence of real YouTube
             videos. Reloading a path never starts another model call.
           </p>
+          {isCreating ? (
+            <div
+              className="mt-7 flex max-w-2xl items-center gap-3 rounded-2xl border border-amber-200/15 bg-amber-300/[0.06] px-4 py-3 text-sm text-amber-50/90"
+              role="status"
+              aria-live="polite"
+            >
+              <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-amber-200" />
+              <span>
+                {createPhase === 'saving'
+                  ? 'Saving your intention...'
+                  : 'Finding a clear sequence for your next step...'}
+              </span>
+            </div>
+          ) : null}
         </section>
 
         <form

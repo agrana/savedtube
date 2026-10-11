@@ -4,8 +4,10 @@ import { useSession } from 'next-auth/react';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { YouTubePlayer, TimeInterval } from '../../../components/YouTubePlayer';
-import { IntervalManager } from '../../../components/IntervalManager';
+import {
+  YouTubePlayer,
+  type TimeInterval,
+} from '../../../components/YouTubePlayer';
 import PathVideoDismissControl from '@/components/PathVideoDismissControl';
 import type { IntervalSuggestionView } from '../../../components/IntervalManager';
 import { VideoInterval } from '../../../types/intervals';
@@ -80,6 +82,17 @@ const mergeLocalIntervalNames = (
   }));
 };
 
+const getResumePositionKey = (videoId: string) =>
+  `savedtube:resume-position:${videoId}`;
+
+const readResumePosition = (videoId: string): number | null => {
+  if (typeof window === 'undefined') return null;
+  const value = Number(
+    window.localStorage.getItem(getResumePositionKey(videoId))
+  );
+  return Number.isFinite(value) && value > 3 ? value : null;
+};
+
 function pathWatchHref(
   youtubeVideoId: string,
   pathId: string,
@@ -113,7 +126,10 @@ export default function WatchPage() {
   const [loopEnabled, setLoopEnabled] = useState(false);
   const [showIntervalPanel, setShowIntervalPanel] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [videoDuration] = useState<number | undefined>(undefined);
+  const [resumeRequest, setResumeRequest] = useState<{
+    time: number;
+    token: number;
+  } | null>(null);
   const [activeIntervalId, setActiveIntervalId] = useState<string | null>(null);
   const [seekRequest, setSeekRequest] = useState<{
     time: number;
@@ -509,6 +525,23 @@ export default function WatchPage() {
   ]);
 
   useEffect(() => {
+    const savedPosition = readResumePosition(videoId);
+    setResumeRequest(
+      savedPosition === null ? null : { time: savedPosition, token: Date.now() }
+    );
+  }, [videoId]);
+
+  const saveStartPosition = () => {
+    if (typeof window === 'undefined' || currentTime <= 3) return;
+    const position = Math.floor(currentTime);
+    window.localStorage.setItem(
+      getResumePositionKey(videoId),
+      String(position)
+    );
+    setResumeRequest({ time: position, token: Date.now() });
+  };
+
+  useEffect(() => {
     const storedAutoplay =
       typeof window !== 'undefined'
         ? window.localStorage.getItem('savedtube:autoplay')
@@ -732,9 +765,13 @@ export default function WatchPage() {
         setActiveIntervalId(interval?.id ?? null);
       }}
       onCurrentTimeUpdate={setCurrentTime}
-      seekToSeconds={seekRequest?.time ?? null}
-      seekToToken={seekRequest?.token}
-      onSeekComplete={() => setSeekRequest(null)}
+      seekToSeconds={resumeRequest?.time ?? seekRequest?.time ?? null}
+      seekToToken={resumeRequest?.token ?? seekRequest?.token}
+      playAfterSeek={resumeRequest === null}
+      onSeekComplete={() => {
+        setResumeRequest(null);
+        setSeekRequest(null);
+      }}
       playThroughIntervals={playThrough !== null}
       playThroughStartIndex={playThrough?.startIndex ?? 0}
     />
@@ -875,6 +912,21 @@ export default function WatchPage() {
                   Next
                 </button>
               </div>
+              {!isPublicDemoWatch ? (
+                <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/[0.06] pt-4">
+                  <button
+                    type="button"
+                    onClick={saveStartPosition}
+                    disabled={currentTime <= 3}
+                    className="rounded-full border border-amber-200/25 bg-amber-300/10 px-4 py-2 text-sm font-medium text-amber-50 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Start from here next time
+                  </button>
+                  <span className="text-xs text-stone-500">
+                    Save this moment as your return point for this video.
+                  </span>
+                </div>
+              ) : null}
             </div>
 
             {!isPublicDemoWatch ? (
@@ -954,72 +1006,8 @@ export default function WatchPage() {
         </>
       )}
 
-      {!isPublicDemoWatch && (
-        <button
-          onClick={() => setShowIntervalPanel(!showIntervalPanel)}
-          className="fixed right-5 top-24 z-30 rounded-full border border-amber-200/25 bg-amber-300/15 p-3 text-amber-100 shadow-2xl shadow-black/40 transition hover:bg-amber-300/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#080806]"
-          title="Manage time intervals"
-        >
-          <svg
-            className="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-        </button>
-      )}
-
-      {!isPublicDemoWatch && (
-        <IntervalManager
-          videoId={videoId}
-          intervals={intervals}
-          loopEnabled={loopEnabled}
-          videoDuration={videoDuration}
-          currentTime={currentTime}
-          onAddInterval={handleAddInterval}
-          onDeleteInterval={handleDeleteInterval}
-          onRenameInterval={handleRenameInterval}
-          onToggleLoop={(enabled) => {
-            setPlayThrough(null);
-            setLoopEnabled(enabled);
-          }}
-          onImportFromYouTube={handleImportFromYouTube}
-          isImporting={isImportingIntervals}
-          importError={importError}
-          importMessage={importMessage}
-          suggestions={suggestions}
-          suggestionsState={suggestionsState}
-          suggestionsMessage={suggestionsMessage}
-          isAcceptingSuggestion={isAcceptingSuggestion}
-          onGenerateSuggestions={
-            mode === 'path' && pathId && pathVideoId && !isPublicDemoWatch
-              ? handleGenerateSuggestions
-              : undefined
-          }
-          onAcceptSuggestion={
-            mode === 'path' && pathId && pathVideoId && !isPublicDemoWatch
-              ? handleAcceptSuggestion
-              : undefined
-          }
-          activeIntervalId={activeIntervalId}
-          onSelectInterval={(interval) => {
-            const startIndex = sortedIntervals.findIndex(
-              (item) => item.id === interval.id
-            );
-            setPlayThrough({ startIndex: startIndex >= 0 ? startIndex : 0 });
-            setSeekRequest({ time: interval.startTime, token: Date.now() });
-          }}
-          isOpen={showIntervalPanel}
-          onClose={() => setShowIntervalPanel(false)}
-        />
-      )}
+      {/* Interval practice remains available in the data model for recovery,
+          while the primary watch journey uses a simple return point. */}
     </div>
   );
 }
