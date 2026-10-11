@@ -104,6 +104,43 @@ const saveResumePosition = (videoId: string, time: number) => {
   );
 };
 
+const getBookmarkKey = (videoId: string) => `savedtube:bookmarks:${videoId}`;
+
+interface VideoBookmark {
+  id: string;
+  time: number;
+}
+
+const readBookmarks = (videoId: string): VideoBookmark[] => {
+  if (typeof window === 'undefined') return [];
+
+  try {
+    const value: unknown = JSON.parse(
+      window.localStorage.getItem(getBookmarkKey(videoId)) || '[]'
+    );
+    if (!Array.isArray(value)) return [];
+
+    return value
+      .filter(
+        (bookmark): bookmark is VideoBookmark =>
+          typeof bookmark === 'object' &&
+          bookmark !== null &&
+          typeof (bookmark as VideoBookmark).id === 'string' &&
+          Number.isFinite((bookmark as VideoBookmark).time) &&
+          (bookmark as VideoBookmark).time >= 0
+      )
+      .sort((a, b) => a.time - b.time);
+  } catch {
+    return [];
+  }
+};
+
+const formatBookmarkTime = (seconds: number): string => {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = Math.floor(seconds % 60);
+  return `${minutes}:${remainder.toString().padStart(2, '0')}`;
+};
+
 function pathWatchHref(
   youtubeVideoId: string,
   pathId: string,
@@ -138,6 +175,7 @@ export default function WatchPage() {
   const [showIntervalPanel, setShowIntervalPanel] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const currentTimeRef = useRef(0);
+  const [bookmarks, setBookmarks] = useState<VideoBookmark[]>([]);
   const [resumeRequest, setResumeRequest] = useState<{
     time: number;
     token: number;
@@ -541,6 +579,7 @@ export default function WatchPage() {
     setResumeRequest(
       savedPosition === null ? null : { time: savedPosition, token: Date.now() }
     );
+    setBookmarks(readBookmarks(videoId));
   }, [videoId]);
 
   useEffect(() => {
@@ -567,11 +606,36 @@ export default function WatchPage() {
     };
   }, [mode, videoId]);
 
-  const saveStartPosition = () => {
-    if (currentTime <= 3) return;
-    const position = Math.floor(currentTime);
-    saveResumePosition(videoId, position);
-    setResumeRequest({ time: position, token: Date.now() });
+  const addBookmark = () => {
+    if (typeof window === 'undefined' || currentTime <= 0) return;
+
+    const bookmark: VideoBookmark = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      time: Math.floor(currentTime),
+    };
+    const nextBookmarks = [...bookmarks, bookmark].sort(
+      (a, b) => a.time - b.time
+    );
+    setBookmarks(nextBookmarks);
+    window.localStorage.setItem(
+      getBookmarkKey(videoId),
+      JSON.stringify(nextBookmarks)
+    );
+  };
+
+  const removeBookmark = (bookmarkId: string) => {
+    const nextBookmarks = bookmarks.filter(
+      (bookmark) => bookmark.id !== bookmarkId
+    );
+    setBookmarks(nextBookmarks);
+    window.localStorage.setItem(
+      getBookmarkKey(videoId),
+      JSON.stringify(nextBookmarks)
+    );
+  };
+
+  const jumpToBookmark = (bookmark: VideoBookmark) => {
+    setSeekRequest({ time: bookmark.time, token: Date.now() });
   };
 
   useEffect(() => {
@@ -946,18 +1010,52 @@ export default function WatchPage() {
                 </button>
               </div>
               {!isPublicDemoWatch ? (
-                <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/[0.06] pt-4">
-                  <button
-                    type="button"
-                    onClick={saveStartPosition}
-                    disabled={currentTime <= 3}
-                    className="rounded-full border border-amber-200/25 bg-amber-300/10 px-4 py-2 text-sm font-medium text-amber-50 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Start from here next time
-                  </button>
-                  <span className="text-xs text-stone-500">
-                    Save this moment as your return point for this video.
-                  </span>
+                <div className="mt-5 space-y-4 border-t border-white/[0.06] pt-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={addBookmark}
+                      disabled={currentTime <= 0}
+                      className="rounded-full border border-amber-200/25 bg-amber-300/10 px-4 py-2 text-sm font-medium text-amber-50 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Add bookmark at {formatBookmarkTime(currentTime)}
+                    </button>
+                    <span className="text-xs text-stone-500">
+                      Your return position is saved automatically.
+                    </span>
+                  </div>
+                  {bookmarks.length > 0 ? (
+                    <div className="space-y-2">
+                      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-stone-500">
+                        Bookmarks
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {bookmarks.map((bookmark, index) => (
+                          <div
+                            key={bookmark.id}
+                            className="flex items-center overflow-hidden rounded-full border border-white/10 bg-white/[0.04]"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => jumpToBookmark(bookmark)}
+                              className="px-3 py-1.5 text-xs text-stone-200 transition hover:bg-white/[0.08] hover:text-white"
+                              aria-label={`Jump to bookmark ${index + 1} at ${formatBookmarkTime(bookmark.time)}`}
+                            >
+                              {index + 1} · {formatBookmarkTime(bookmark.time)}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeBookmark(bookmark.id)}
+                              className="border-l border-white/10 px-2 py-1.5 text-xs text-stone-500 transition hover:bg-white/[0.08] hover:text-red-200"
+                              aria-label={`Remove bookmark ${index + 1}`}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>

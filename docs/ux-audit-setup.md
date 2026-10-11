@@ -18,14 +18,16 @@ The local authenticated journey is ready when `/paths` renders the dashboard and
 Use a disposable video or path and verify the complete return habit:
 
 1. Open a path video and play beyond the first few seconds.
-2. Select **Start from here next time**.
-3. Return to the path with **← Path**.
-4. Open the same video again and confirm playback seeks to the saved point.
-5. Leave the path, reopen it from `/paths`, and select **Resume path**.
-6. Confirm the path remains available, the video starts at the saved point, and Previous/Next navigation still returns to the path context.
-7. Repeat after a reload and after opening a different video.
+2. Add a bookmark at the current player time.
+3. Move to another moment and add a second bookmark.
+4. Select each bookmark and confirm the player jumps to its saved time.
+5. Return to the path with **← Path**.
+6. Open the same video again and confirm it resumes near the last playback position.
+7. Leave the path, reopen it from `/paths`, and select **Resume path**.
+8. Confirm the path remains available, the video starts near the saved position, and Previous/Next navigation still returns to the path context.
+9. Repeat after a reload and after opening a different video.
 
-The resume point is a browser-local preference keyed to the YouTube video. It does not change practiced state, path order, exclusions, or shared path data.
+The resume point and bookmarks are browser-local preferences keyed to the YouTube video. They do not change practiced state, path order, exclusions, or shared path data.
 
 ## Evidence to record
 
