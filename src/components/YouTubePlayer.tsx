@@ -112,8 +112,9 @@ export function YouTubePlayer({
     () => `youtube-player-${Math.random().toString(36).substr(2, 9)}`
   );
 
-  // State to track video changes
-  const [lastVideoId, setLastVideoId] = useState('');
+  // Keep the creation guard synchronous so Strict Mode's effect replay cannot
+  // construct a second player for the same video before React applies state.
+  const lastVideoIdRef = useRef('');
 
   // Interval playback state
   const [currentIntervalIndex, setCurrentIntervalIndex] = useState(0);
@@ -160,17 +161,14 @@ export function YouTubePlayer({
   useEffect(() => {
     if (!isYouTubeAPIReady || !containerRef.current || !videoId) return;
 
-    // Reset state when video changes
-    if (lastVideoId !== videoId) {
-      setLastVideoId(videoId);
-    }
-
-    // Only create new player if video ID changes or no player exists
-    if (!playerRef.current || lastVideoId !== videoId) {
-      // Destroy existing player if it exists
+    // Only create a new player if the video ID changed or no player exists.
+    if (!playerRef.current || lastVideoIdRef.current !== videoId) {
       if (playerRef.current) {
         playerRef.current.destroy();
       }
+
+      lastVideoIdRef.current = videoId;
+      setIsPlayerReady(false);
 
       try {
         // Create new player with distraction-minimizing parameters
@@ -231,7 +229,6 @@ export function YouTubePlayer({
     onPlay,
     onPause,
     onError,
-    lastVideoId,
     autoPlay,
   ]);
 
