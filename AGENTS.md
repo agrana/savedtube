@@ -20,6 +20,19 @@ Treat `saved-tube.md` as the current product-direction note. Preserve that file 
 - Keep secrets out of source files, prompts, commits, logs, and command output.
 - Run the smallest relevant validation after each change, then review the final diff.
 - Prefer small, atomic changes with clear verification.
+- Read `backlog.md` before starting a new feature slice and update the relevant item as scope changes.
+- Update `CHANGELOG.md` in the same change when a user-visible or meaningful engineering change is delivered to `main`.
+- Move completed backlog items to the change log, and record deliberate deferrals in `backlog.md`.
+- Keep `CHANGELOG.md` as the delivery history and `backlog.md` as the canonical unfinished-work list; do not use conversation history as the sole tracker.
+
+## Product tracking
+
+- `CHANGELOG.md` records delivered SavedTube changes, grouped by delivery date.
+- `backlog.md` records unfinished, deferred, and follow-up work.
+- `saved-tube.md` remains the product brief and long-range direction; keep its broader planned-improvements section aligned with `backlog.md` when product scope changes.
+- UX evidence and verification details remain in `docs/ux-audit-2026-10-10.md` and `docs/ux-audit-setup.md`; link to those documents from backlog items when relevant.
+
+Before reporting a feature as complete, verify that the implementation, tests, `CHANGELOG.md`, and relevant `backlog.md` item all agree.
 
 ## Supabase migrations
 
