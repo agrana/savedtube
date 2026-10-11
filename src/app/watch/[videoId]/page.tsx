@@ -109,6 +109,7 @@ const getBookmarkKey = (videoId: string) => `savedtube:bookmarks:${videoId}`;
 interface VideoBookmark {
   id: string;
   time: number;
+  name: string;
 }
 
 const readBookmarks = (videoId: string): VideoBookmark[] => {
@@ -129,6 +130,13 @@ const readBookmarks = (videoId: string): VideoBookmark[] => {
           Number.isFinite((bookmark as VideoBookmark).time) &&
           (bookmark as VideoBookmark).time >= 0
       )
+      .map((bookmark, index) => ({
+        ...bookmark,
+        name:
+          typeof bookmark.name === 'string' && bookmark.name.trim()
+            ? bookmark.name.trim()
+            : `Bookmark ${index + 1}`,
+      }))
       .sort((a, b) => a.time - b.time);
   } catch {
     return [];
@@ -612,6 +620,7 @@ export default function WatchPage() {
     const bookmark: VideoBookmark = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       time: Math.floor(currentTime),
+      name: `Bookmark ${bookmarks.length + 1}`,
     };
     const nextBookmarks = [...bookmarks, bookmark].sort(
       (a, b) => a.time - b.time
@@ -626,6 +635,19 @@ export default function WatchPage() {
   const removeBookmark = (bookmarkId: string) => {
     const nextBookmarks = bookmarks.filter(
       (bookmark) => bookmark.id !== bookmarkId
+    );
+    setBookmarks(nextBookmarks);
+    window.localStorage.setItem(
+      getBookmarkKey(videoId),
+      JSON.stringify(nextBookmarks)
+    );
+  };
+
+  const renameBookmark = (bookmarkId: string, name: string) => {
+    const nextBookmarks = bookmarks.map((bookmark) =>
+      bookmark.id === bookmarkId
+        ? { ...bookmark, name: name.trim() || 'Untitled bookmark' }
+        : bookmark
     );
     setBookmarks(nextBookmarks);
     window.localStorage.setItem(
@@ -1029,24 +1051,39 @@ export default function WatchPage() {
                       <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-stone-500">
                         Bookmarks
                       </p>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="space-y-2">
                         {bookmarks.map((bookmark, index) => (
                           <div
                             key={bookmark.id}
-                            className="flex items-center overflow-hidden rounded-full border border-white/10 bg-white/[0.04]"
+                            className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-2"
                           >
                             <button
                               type="button"
                               onClick={() => jumpToBookmark(bookmark)}
-                              className="px-3 py-1.5 text-xs text-stone-200 transition hover:bg-white/[0.08] hover:text-white"
-                              aria-label={`Jump to bookmark ${index + 1} at ${formatBookmarkTime(bookmark.time)}`}
+                              className="rounded-full px-2 py-1.5 text-xs text-stone-200 transition hover:bg-white/[0.08] hover:text-white"
+                              aria-label={`Jump to ${bookmark.name} at ${formatBookmarkTime(bookmark.time)}`}
                             >
-                              {index + 1} · {formatBookmarkTime(bookmark.time)}
+                              {formatBookmarkTime(bookmark.time)}
                             </button>
+                            <input
+                              type="text"
+                              defaultValue={bookmark.name}
+                              maxLength={100}
+                              onBlur={(event) =>
+                                renameBookmark(bookmark.id, event.target.value)
+                              }
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                  event.currentTarget.blur();
+                                }
+                              }}
+                              aria-label={`Name bookmark ${index + 1}`}
+                              className="min-w-[10rem] flex-1 rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs text-stone-100 outline-none transition placeholder:text-stone-600 focus:border-amber-200/40 focus:ring-1 focus:ring-amber-200/30"
+                            />
                             <button
                               type="button"
                               onClick={() => removeBookmark(bookmark.id)}
-                              className="border-l border-white/10 px-2 py-1.5 text-xs text-stone-500 transition hover:bg-white/[0.08] hover:text-red-200"
+                              className="rounded-full px-2 py-1.5 text-xs text-stone-500 transition hover:bg-white/[0.08] hover:text-red-200"
                               aria-label={`Remove bookmark ${index + 1}`}
                             >
                               ×
