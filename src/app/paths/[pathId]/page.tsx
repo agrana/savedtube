@@ -327,7 +327,11 @@ export default function PathDetailPage() {
     try {
       // Explicit user action only — do not auto-redirect on mount (avoids loops).
       await signOut({ redirect: false });
-      await signIn('google', { callbackUrl });
+      await signIn(
+        'google',
+        { callbackUrl },
+        { prompt: 'consent', access_type: 'offline' }
+      );
     } catch (error) {
       console.error('Error reconnecting Google YouTube auth:', error);
       setResearchBanner(YOUTUBE_REAUTH_REQUIRED_MESSAGE);

@@ -4,6 +4,10 @@ This file records user-visible product changes and meaningful engineering change
 
 ## 2026-10-11
 
+### Fixed
+
+- Made the explicit Google YouTube reconnect flow request offline access and fresh consent, so an existing SavedTube session can recover an expired or missing YouTube authorization without treating the user as logged out.
+
 ### Added
 
 - Added named video bookmarks. Bookmarks have editable names, persist in browser-local storage, and remain independently jumpable and removable.

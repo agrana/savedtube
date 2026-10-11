@@ -130,7 +130,10 @@ describe('path research UI reconnect (source)', () => {
     assert.match(page, /needsYouTubeReconnect/);
     assert.match(page, /handleReconnectYouTube/);
     assert.match(page, /signOut\(\{\s*redirect:\s*false\s*\}\)/);
-    assert.match(page, /signIn\('google',\s*\{\s*callbackUrl\s*\}/);
+    assert.match(
+      page,
+      /signIn\(\s*'google',\s*\{\s*callbackUrl\s*\},\s*\{\s*prompt:\s*'consent',\s*access_type:\s*'offline'\s*\}\s*\)/
+    );
     assert.match(page, /Reconnect Google YouTube/);
     assert.doesNotMatch(
       page,
