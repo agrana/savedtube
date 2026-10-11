@@ -85,6 +85,11 @@ function researchFailureMessage(
   }
 }
 
+function formatVideoMinutes(seconds: number): string {
+  const minutes = Math.round(seconds / 60);
+  return minutes < 1 ? '<1 min' : `${minutes} min`;
+}
+
 function researchIdempotencyStorageKey(pathId: string): string {
   return `savedtube:research-idempotency:${pathId}`;
 }
@@ -461,6 +466,31 @@ export default function PathDetailPage() {
     return researchFailureMessage(pageState.latestJob, researchBanner);
   }, [pageState, researchBanner]);
 
+  const durationSummary = useMemo(() => {
+    if (pageState.status !== 'ready') {
+      return null;
+    }
+
+    const practicedIds = new Set(pageState.progress?.practicedVideoIds || []);
+    const videos = pageState.stages.flatMap((stage) => stage.videos);
+    const remainingVideos = videos.filter(
+      (video) => !practicedIds.has(video.id)
+    );
+    const remainingSeconds = remainingVideos.reduce(
+      (total, video) => total + (video.duration_seconds || 0),
+      0
+    );
+    const videosWithoutDuration = remainingVideos.filter(
+      (video) => video.duration_seconds == null
+    ).length;
+
+    return {
+      remainingSeconds,
+      remainingVideos: remainingVideos.length,
+      videosWithoutDuration,
+    };
+  }, [pageState]);
+
   if (sessionStatus === 'loading') {
     return (
       <div className="min-h-screen bg-[#080806] text-stone-100 flex items-center justify-center">
@@ -581,6 +611,16 @@ export default function PathDetailPage() {
                       {pageState.progress.practicedCount} of{' '}
                       {pageState.progress.totalVideos} practiced
                     </p>
+                    {durationSummary && durationSummary.remainingVideos > 0 && (
+                      <p className="mt-1 text-sm font-medium text-amber-100/80">
+                        {durationSummary.remainingSeconds > 0
+                          ? `${formatVideoMinutes(durationSummary.remainingSeconds)} of video to go`
+                          : 'Video time remaining is being checked'}
+                        {durationSummary.videosWithoutDuration > 0
+                          ? ` · ${durationSummary.videosWithoutDuration} video${durationSummary.videosWithoutDuration === 1 ? '' : 's'} without a duration`
+                          : ''}
+                      </p>
+                    )}
                     {pageState.progress.continueTarget && (
                       <Link
                         href={buildPathWatchHref(

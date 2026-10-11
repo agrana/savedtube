@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -33,6 +33,12 @@ function getOrCreateIdempotencyKey(pathId: string): string {
   return key;
 }
 
+const researchProgressMoments = [
+  'Finding strong starting points...',
+  'Comparing videos for signal and fit...',
+  'Shaping a sequence you can return to...',
+] as const;
+
 export default function NewPathPage() {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
@@ -43,6 +49,20 @@ export default function NewPathPage() {
   const [createPhase, setCreatePhase] = useState<
     'idle' | 'saving' | 'researching'
   >('idle');
+  const [researchBeat, setResearchBeat] = useState(0);
+
+  useEffect(() => {
+    if (createPhase !== 'researching') {
+      setResearchBeat(0);
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setResearchBeat((beat) => (beat + 1) % 3);
+    }, 2200);
+
+    return () => window.clearInterval(timer);
+  }, [createPhase]);
 
   const handleCreate = async (event: FormEvent) => {
     event.preventDefault();
@@ -198,16 +218,43 @@ export default function NewPathPage() {
           </p>
           {isCreating ? (
             <div
-              className="mt-7 flex max-w-2xl items-center gap-3 rounded-2xl border border-amber-200/15 bg-amber-300/[0.06] px-4 py-3 text-sm text-amber-50/90"
+              className="mt-7 max-w-2xl rounded-2xl border border-amber-200/15 bg-amber-300/[0.06] px-4 py-4 text-sm text-amber-50/90"
               role="status"
               aria-live="polite"
             >
-              <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-amber-200" />
-              <span>
-                {createPhase === 'saving'
-                  ? 'Saving your intention...'
-                  : 'Finding a clear sequence for your next step...'}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="relative flex h-2.5 w-2.5 shrink-0">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-200/70" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-200" />
+                </span>
+                <span>
+                  {createPhase === 'saving'
+                    ? 'Saving your intention...'
+                    : researchProgressMoments[researchBeat]}
+                </span>
+              </div>
+              {createPhase === 'researching' ? (
+                <div className="mt-4 grid grid-cols-3 gap-2" aria-hidden="true">
+                  {researchProgressMoments.map((moment, index) => (
+                    <div key={moment}>
+                      <div
+                        className={`h-1 rounded-full transition-colors duration-500 ${
+                          index === researchBeat
+                            ? 'bg-amber-200 animate-pulse'
+                            : 'bg-white/10'
+                        }`}
+                      />
+                      <span className="mt-2 block truncate text-[10px] uppercase tracking-[0.12em] text-stone-500">
+                        {index === 0
+                          ? 'Discover'
+                          : index === 1
+                            ? 'Compare'
+                            : 'Shape'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ) : null}
         </section>
