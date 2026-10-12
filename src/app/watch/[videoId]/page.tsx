@@ -168,6 +168,7 @@ export default function WatchPage() {
   const pathVideoId = searchParams.get('pathVideoId');
   const mode =
     pathId && pathVideoId ? 'path' : playlistId ? 'playlist' : 'standalone';
+  const hasSession = status === 'authenticated';
 
   const [playlistItems, setPlaylistItems] = useState<PlaylistItem[]>([]);
   const [pathContext, setPathContext] = useState<PathWatchContext | null>(null);
@@ -547,7 +548,7 @@ export default function WatchPage() {
 
     // Personal playlist/path/standalone watch stays sign-in protected.
     // The curated public demo may play without a session.
-    if (!session && !isPublicDemoWatch) {
+    if (!hasSession && !isPublicDemoWatch) {
       router.push('/');
       return;
     }
@@ -566,13 +567,13 @@ export default function WatchPage() {
     }
 
     // Intervals are personal — skip private API calls for anonymous demo visitors.
-    if (session) {
+    if (hasSession) {
       void fetchIntervals();
     } else {
       setIntervals([]);
     }
   }, [
-    session,
+    hasSession,
     status,
     mode,
     isPublicDemoWatch,

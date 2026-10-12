@@ -219,7 +219,7 @@ describe('logged-out route behavior', () => {
     );
     assert.match(watchPage, /isPublicDemoPathId/);
     assert.match(watchPage, /loadDemoWatchContext/);
-    assert.match(watchPage, /!session && !isPublicDemoWatch/);
+    assert.match(watchPage, /!hasSession && !isPublicDemoWatch/);
     assert.match(watchPage, /callbackUrl|router\.push\('\/'\)/);
   });
 

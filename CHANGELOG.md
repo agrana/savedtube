@@ -7,6 +7,7 @@ This file records user-visible product changes and meaningful engineering change
 ### Fixed
 
 - Made the explicit Google YouTube reconnect flow request offline access and fresh consent, so an existing SavedTube session can recover an expired or missing YouTube authorization without treating the user as logged out.
+- Prevented the five-minute authentication refresh from unmounting and restarting the active YouTube player.
 
 ### Added
 
