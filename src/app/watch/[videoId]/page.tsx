@@ -787,7 +787,7 @@ export default function WatchPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [goToNext, goToPrevious, mode, pathContext, playlistId, router]);
 
-  if (status === 'loading' || isLoading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-[#080806] text-stone-100 flex items-center justify-center">
         <div className="animate-spin rounded-full h-24 w-24 border-b-2 border-amber-200"></div>
