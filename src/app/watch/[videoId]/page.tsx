@@ -584,11 +584,20 @@ export default function WatchPage() {
   ]);
 
   useEffect(() => {
-    const savedPosition = readResumePosition(videoId);
-    setResumeRequest(
-      savedPosition === null ? null : { time: savedPosition, token: Date.now() }
-    );
+    const restoreResumePosition = () => {
+      const savedPosition = readResumePosition(videoId);
+      setResumeRequest(
+        savedPosition === null
+          ? null
+          : { time: savedPosition, token: Date.now() }
+      );
+    };
+
+    restoreResumePosition();
     setBookmarks(readBookmarks(videoId));
+    window.addEventListener('pageshow', restoreResumePosition);
+
+    return () => window.removeEventListener('pageshow', restoreResumePosition);
   }, [videoId]);
 
   useEffect(() => {
@@ -885,6 +894,7 @@ export default function WatchPage() {
         setActiveIntervalId(interval?.id ?? null);
       }}
       onCurrentTimeUpdate={setCurrentTime}
+      onPause={() => saveResumePosition(videoId, currentTimeRef.current)}
       seekToSeconds={resumeRequest?.time ?? seekRequest?.time ?? null}
       seekToToken={resumeRequest?.token ?? seekRequest?.token}
       playAfterSeek={resumeRequest === null}
