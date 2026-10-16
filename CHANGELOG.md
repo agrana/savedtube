@@ -2,6 +2,12 @@
 
 This file records user-visible product changes and meaningful engineering changes. Each completed feature slice gets an entry when it is delivered. Deferred ideas and unfinished work belong in [`backlog.md`](backlog.md).
 
+## 2026-10-17
+
+### Changed
+
+- Hid the path sequence editor behind an **Edit sequence** disclosure next to **Regenerate draft**, so the map stays primary while editing remains available on demand with Done to close.
+
 ## 2026-10-16
 
 ### Changed

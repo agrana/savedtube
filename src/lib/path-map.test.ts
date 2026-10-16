@@ -576,6 +576,48 @@ describe('path-map accessibility structure', () => {
     assert.match(source, /data\.stages/);
   });
 
+  it('path detail keeps sequence editor hidden until Edit sequence disclosure', () => {
+    const source = readFileSync(
+      join(root, 'src/app/paths/[pathId]/page.tsx'),
+      'utf8'
+    );
+    assert.match(
+      source,
+      /const \[isSequenceEditorOpen, setIsSequenceEditorOpen\] = useState\(false\)/
+    );
+    assert.match(
+      source,
+      /useEffect\(\(\) => \{\s*setIsSequenceEditorOpen\(false\);\s*\}, \[pathId\]\)/
+    );
+    assert.match(source, /aria-expanded=\{isSequenceEditorOpen\}/);
+    assert.match(source, /aria-controls="path-sequence-editor"/);
+    assert.match(source, />\s*Edit sequence\s*</);
+    assert.match(source, /id="path-sequence-editor"/);
+    assert.match(source, /role="region"/);
+    assert.match(
+      source,
+      /aria-labelledby="path-sequence-editor-heading"/
+    );
+    assert.match(source, /hidden=\{!isSequenceEditorOpen\}/);
+    assert.match(source, /setIsSequenceEditorOpen\(false\)/);
+    assert.match(source, />\s*Done\s*</);
+
+    const regenerateIndex = source.indexOf('Regenerate draft');
+    const editDisclosureIndex = source.indexOf('aria-controls="path-sequence-editor"');
+    const mapIndex = source.indexOf('<PathMap');
+    const editorRegionIndex = source.indexOf('id="path-sequence-editor"');
+    const emptyPathIndex = source.indexOf('Empty path');
+    assert.ok(regenerateIndex > 0);
+    assert.ok(editDisclosureIndex > regenerateIndex);
+    assert.ok(mapIndex > editDisclosureIndex);
+    assert.ok(editorRegionIndex > mapIndex);
+    assert.ok(emptyPathIndex > 0);
+    assert.match(source, /No stages yet\. Research builds a stored sequence/);
+    assert.match(source, /action: 'rename_stage'/);
+    assert.match(source, /action: 'reorder_stages'/);
+    assert.match(source, /PathDismissedVideosReview/);
+  });
+
   it('demo landing keeps inline selection and selected stage wiring', () => {
     const source = readFileSync(
       join(root, 'src/components/DemoPathLanding.tsx'),

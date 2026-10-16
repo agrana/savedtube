@@ -128,6 +128,7 @@ export default function PathDetailPage() {
   const [dismissedVideos, setDismissedVideos] = useState<
     PathVideoDismissalReviewItem[]
   >([]);
+  const [isSequenceEditorOpen, setIsSequenceEditorOpen] = useState(false);
 
   const fetchPath = useCallback(async () => {
     if (!pathId) {
@@ -226,6 +227,10 @@ export default function PathDetailPage() {
       });
     }
   }, [sessionStatus, fetchPath]);
+
+  useEffect(() => {
+    setIsSequenceEditorOpen(false);
+  }, [pathId]);
 
   const handleDelete = async () => {
     if (!pathId || isDeleting) {
@@ -714,14 +719,27 @@ export default function PathDetailPage() {
                   </button>
                 )}
                 {pageState.stages.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => void handleResearch()}
-                    disabled={isResearching}
-                    className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-stone-200 transition hover:bg-white/[0.06] disabled:opacity-60"
-                  >
-                    {isResearching ? 'Regenerating...' : 'Regenerate draft'}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void handleResearch()}
+                      disabled={isResearching}
+                      className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-stone-200 transition hover:bg-white/[0.06] disabled:opacity-60"
+                    >
+                      {isResearching ? 'Regenerating...' : 'Regenerate draft'}
+                    </button>
+                    <button
+                      type="button"
+                      aria-expanded={isSequenceEditorOpen}
+                      aria-controls="path-sequence-editor"
+                      onClick={() =>
+                        setIsSequenceEditorOpen((current) => !current)
+                      }
+                      className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-stone-200 transition hover:bg-white/[0.06]"
+                    >
+                      Edit sequence
+                    </button>
+                  </>
                 )}
                 <button
                   type="button"
@@ -824,10 +842,19 @@ export default function PathDetailPage() {
                 </p>
               </section>
             ) : (
-              <section className="space-y-4">
+              <section
+                id="path-sequence-editor"
+                role="region"
+                aria-labelledby="path-sequence-editor-heading"
+                hidden={!isSequenceEditorOpen}
+                className="space-y-4"
+              >
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <div>
-                    <h2 className="text-xl font-medium tracking-[-0.03em] text-stone-100">
+                    <h2
+                      id="path-sequence-editor-heading"
+                      className="text-xl font-medium tracking-[-0.03em] text-stone-100"
+                    >
                       Edit sequence
                     </h2>
                     <p className="mt-1 max-w-2xl text-sm text-stone-500">
@@ -836,6 +863,13 @@ export default function PathDetailPage() {
                       to restore later.
                     </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsSequenceEditorOpen(false)}
+                    className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-stone-200 transition hover:bg-white/[0.06]"
+                  >
+                    Done
+                  </button>
                 </div>
                 <ol className="space-y-4">
                   {pageState.stages.map((stage, stageIndex) => {
