@@ -4,6 +4,11 @@ This file records user-visible product changes and meaningful engineering change
 
 ## 2026-10-16
 
+### Changed
+
+- Made the path map the primary composition with a sequential lesson spine, compact background stage groupings, and a quiet goal heading. Desktop paths flow left-to-right and portrait phone paths top-to-bottom.
+- Placed the public demo map at full width above the player and kept the accessible sequence available without a competing visible list. Approved after desktop and phone visual review; saved-position restoration and celebrations remain separate slices.
+
 ### Added
 
 - Added the first guided path-map experience: a responsive left-to-right desktop and top-to-bottom portrait-mobile flow with continuous connectors, stage numbers, current/completed states, explicit recommended-next guidance, truthful practiced counts, and Start/Continue actions.

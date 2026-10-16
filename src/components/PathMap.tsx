@@ -11,6 +11,7 @@ import {
   type PathMapLayout,
   type PathMapLayoutVariant,
   type PathMapNode,
+  type PathMapStageBand,
   type PathMapStageSummary,
   type PathPresentation,
 } from '@/lib/path-map';
@@ -32,33 +33,43 @@ export type PathMapProps = BuildPathPresentationInput & {
   }) => void;
 };
 
-const NODE_BASE =
-  'absolute box-border overflow-hidden rounded-2xl border px-3 py-2 text-left outline-none transition motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-amber-200/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#080806]';
-
 const FOCUS_RING =
   'outline-none transition motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-amber-200/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#080806]';
 
-function nodeClassName(node: PathMapNode): string {
-  if (node.kind === 'goal') {
-    return `${NODE_BASE} border-amber-200/30 bg-amber-300/10 text-amber-50`;
+const STAGE_HEADING =
+  'absolute box-border flex items-center gap-2 overflow-hidden rounded-md px-1.5 text-left outline-none transition motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-amber-200/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#080806]';
+
+const LESSON_BASE =
+  'absolute box-border overflow-hidden rounded-xl border px-3 py-2 text-left outline-none transition motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-amber-200/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#080806]';
+
+function stageHeadingClassName(node: Extract<PathMapNode, { kind: 'stage' }>): string {
+  if (node.isCurrent) {
+    return `${STAGE_HEADING} text-amber-100/90 hover:text-amber-50`;
   }
-  if (node.kind === 'stage') {
-    const current = node.isCurrent
-      ? 'border-amber-200/45 bg-amber-300/12'
-      : node.selected
-        ? 'border-amber-200/35 bg-amber-300/10'
-        : 'border-white/10 bg-[#10100d]/95';
-    const completed = node.completed ? 'ring-1 ring-amber-200/25' : '';
-    return `${NODE_BASE} ${current} ${completed} text-stone-100`;
+  if (node.completed) {
+    return `${STAGE_HEADING} text-stone-400 hover:text-stone-200`;
   }
+  return `${STAGE_HEADING} text-stone-500 hover:text-stone-300`;
+}
+
+function lessonClassName(node: Extract<PathMapNode, { kind: 'video' }>): string {
   const selected = node.selected
-    ? 'border-amber-200/50 bg-amber-300/20 text-amber-50'
-    : 'border-white/8 bg-white/[0.035] text-stone-100 hover:border-amber-200/25 hover:text-amber-50';
+    ? 'border-amber-200/55 bg-amber-300/18 text-amber-50 shadow-[0_0_0_1px_rgba(251,191,36,0.14)]'
+    : node.recommended
+      ? 'border-amber-200/40 bg-amber-300/12 text-amber-50'
+      : 'border-white/10 bg-[#12120f] text-stone-100 hover:border-amber-200/30 hover:text-amber-50';
   const practiced = node.practiced ? 'ring-1 ring-emerald-300/30' : '';
-  const recommended = node.recommended
-    ? 'border-amber-200/40 bg-amber-300/10'
-    : '';
-  return `${NODE_BASE} ${selected} ${practiced} ${recommended}`;
+  return `${LESSON_BASE} ${selected} ${practiced}`;
+}
+
+function bandClassName(band: PathMapStageBand): string {
+  if (band.isCurrent) {
+    return 'absolute rounded-2xl border border-amber-200/15 bg-amber-300/[0.04]';
+  }
+  if (band.completed) {
+    return 'absolute rounded-2xl border border-white/[0.04] bg-white/[0.02]';
+  }
+  return 'absolute rounded-2xl border border-white/[0.03] bg-white/[0.015]';
 }
 
 function LessonAction({
@@ -224,6 +235,19 @@ function MapCanvas({
         style={{ width: layout.width, height: layout.height }}
         aria-label={label}
       >
+        {layout.bands.map((band) => (
+          <div
+            key={band.id}
+            aria-hidden="true"
+            className={bandClassName(band)}
+            style={{
+              left: band.rect.x,
+              top: band.rect.y,
+              width: band.rect.width,
+              height: band.rect.height,
+            }}
+          />
+        ))}
         <svg
           className="pointer-events-none absolute inset-0"
           width={layout.width}
@@ -238,8 +262,9 @@ function MapCanvas({
               y1={connector.y1}
               x2={connector.x2}
               y2={connector.y2}
-              stroke="rgba(245, 158, 11, 0.35)"
+              stroke="rgba(245, 158, 11, 0.28)"
               strokeWidth={PATH_MAP_CONNECTOR_STROKE}
+              strokeLinecap="round"
             />
           ))}
         </svg>
@@ -252,22 +277,7 @@ function MapCanvas({
           };
           const domId = pathMapLayoutDomId(variant, node.id);
           if (node.kind === 'goal') {
-            return (
-              <div
-                key={domId}
-                id={domId}
-                aria-hidden="true"
-                className={nodeClassName(node)}
-                style={style}
-              >
-                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-amber-100/70">
-                  Goal
-                </span>
-                <span className="mt-1 block truncate text-sm font-medium leading-snug">
-                  {node.label}
-                </span>
-              </div>
-            );
+            return null;
           }
           if (node.kind === 'stage') {
             const expanded = expandedStageId === node.stageId;
@@ -279,21 +289,27 @@ function MapCanvas({
                 aria-label={node.ariaLabel}
                 aria-expanded={expanded}
                 aria-controls={node.detailsId}
-                className={nodeClassName(node)}
+                className={stageHeadingClassName(node)}
                 style={style}
                 onClick={() => onToggleStage(node.stageId)}
               >
-                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-amber-100/60">
-                  Stage {node.position + 1}
+                <span className="font-mono text-[10px] uppercase tracking-[0.18em] shrink-0">
+                  {node.position + 1}
                   {node.completed ? ' · ✓' : ''}
-                  {node.isCurrent ? ' · current' : ''}
+                  {node.isCurrent ? ' · now' : ''}
                 </span>
-                <span className="mt-1 block break-words text-sm font-medium leading-snug line-clamp-2">
+                <span className="min-w-0 truncate text-xs font-medium tracking-[-0.01em]">
                   {node.label}
                 </span>
               </button>
             );
           }
+          const meta = [
+            node.recommended ? 'next' : null,
+            node.practiced ? 'practiced' : null,
+          ]
+            .filter(Boolean)
+            .join(' · ');
           if (onVideoSelect) {
             return (
               <button
@@ -301,7 +317,7 @@ function MapCanvas({
                 type="button"
                 id={domId}
                 aria-label={node.ariaLabel}
-                className={nodeClassName(node)}
+                className={lessonClassName(node)}
                 style={style}
                 onClick={() =>
                   onVideoSelect({
@@ -310,13 +326,12 @@ function MapCanvas({
                   })
                 }
               >
-                <span className="block truncate text-sm font-medium leading-snug">
+                <span className="block break-words text-sm font-medium leading-snug line-clamp-2">
                   {node.label}
                 </span>
                 <span className="mt-1 block truncate text-xs text-stone-500">
                   {node.channelTitle || 'YouTube'}
-                  {node.recommended ? ' · next' : ''}
-                  {node.practiced ? ' · practiced' : ''}
+                  {meta ? ` · ${meta}` : ''}
                 </span>
               </button>
             );
@@ -327,16 +342,15 @@ function MapCanvas({
               id={domId}
               href={node.href}
               aria-label={node.ariaLabel}
-              className={nodeClassName(node)}
+              className={lessonClassName(node)}
               style={style}
             >
-              <span className="block truncate text-sm font-medium leading-snug">
+              <span className="block break-words text-sm font-medium leading-snug line-clamp-2">
                 {node.label}
               </span>
               <span className="mt-1 block truncate text-xs text-stone-500">
                 {node.channelTitle || 'YouTube'}
-                {node.recommended ? ' · next' : ''}
-                {node.practiced ? ' · practiced' : ''}
+                {meta ? ` · ${meta}` : ''}
               </span>
             </Link>
           );
@@ -437,6 +451,7 @@ function OrderedListView({
 
 /**
  * Shared path map + ordered list. Derives layout from stored stages only.
+ * Map is the primary visual; the ordered list remains an accessible fallback.
  */
 export default function PathMap({
   pathId,
@@ -497,7 +512,12 @@ export default function PathMap({
         selectionChanged,
       })
     );
-  }, [presentation.contentKey, presentation.currentStageId, selectedStageId, stageIdsKey]);
+  }, [
+    presentation.contentKey,
+    presentation.currentStageId,
+    selectedStageId,
+    stageIdsKey,
+  ]);
 
   const toggleStage = (stageId: string) => {
     setExpandedStageId((current) => (current === stageId ? null : stageId));
@@ -507,10 +527,9 @@ export default function PathMap({
   const expandedStage =
     presentation.stages.find((stage) => stage.stageId === expandedStageId) ||
     null;
-  // Prefer list-adjacent details when the sequence is shown so expansion stays
-  // next to its stage. Map-only surfaces keep a single panel under the canvas.
-  const detailsInOrderedList = showOrderedList;
-  const detailsUnderMap = showMap && !showOrderedList;
+  // Map owns the expansion panel; list stays an accessible ordered fallback.
+  const detailsUnderMap = showMap;
+  const detailsInOrderedList = showOrderedList && !showMap;
 
   return (
     <section
@@ -522,7 +541,18 @@ export default function PathMap({
       data-path-map-expanded-stage={expandedStageId || undefined}
     >
       {showMap && (
-        <div className="overflow-x-auto rounded-[1.5rem] border border-white/10 bg-[#10100d]/90 p-4 sm:p-5">
+        <div className="overflow-x-auto overscroll-x-contain rounded-[1.5rem] border border-white/10 bg-[#10100d]/90 p-3 sm:p-5 [scrollbar-gutter:stable]">
+          <header className="mb-4 max-w-3xl">
+            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-amber-100/55">
+              Path goal
+            </p>
+            <p
+              className="mt-1 text-sm leading-relaxed text-stone-400 break-words"
+              aria-label={presentation.goalAriaLabel}
+            >
+              {presentation.goalContext}
+            </p>
+          </header>
           <MapCanvas
             layout={presentation.desktop}
             variant="desktop"
@@ -554,7 +584,7 @@ export default function PathMap({
         </div>
       )}
       {showOrderedList && (
-        <div className={showMap ? 'mt-5' : undefined}>
+        <div className={showMap ? 'sr-only' : undefined}>
           <OrderedListView
             presentation={presentation}
             heading={listHeading}

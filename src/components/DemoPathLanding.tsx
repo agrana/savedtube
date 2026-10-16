@@ -207,8 +207,18 @@ export default function DemoPathLanding() {
         </div>
       </div>
 
-      <div className="mt-14 grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-        <div id="demo-player" className="space-y-5">
+      <div className="mt-14 space-y-10">
+        <PathMap
+          {...presentationInput}
+          buildVideoHref={(_youtubeVideoId, _pathId, pathVideoId) =>
+            buildDemoLandingHref(pathVideoId)
+          }
+          onVideoSelect={({ pathVideoId }) => handleSelect(pathVideoId)}
+          listHeading="Demo path sequence"
+          className="min-w-0 w-full"
+        />
+
+        <div id="demo-player" className="mx-auto max-w-4xl space-y-5">
           <div className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#10100d] shadow-2xl shadow-black/40">
             {selectedVideo ? (
               <YouTubePlayer
@@ -284,16 +294,6 @@ export default function DemoPathLanding() {
             </p>
           ) : null}
         </div>
-
-        <PathMap
-          {...presentationInput}
-          buildVideoHref={(_youtubeVideoId, _pathId, pathVideoId) =>
-            buildDemoLandingHref(pathVideoId)
-          }
-          onVideoSelect={({ pathVideoId }) => handleSelect(pathVideoId)}
-          listHeading="Demo path sequence"
-          className="min-w-0"
-        />
       </div>
     </section>
   );

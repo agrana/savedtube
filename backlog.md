@@ -24,7 +24,10 @@ This is the canonical list of unfinished, deferred, and deliberately pending Sav
 
 - [ ] Improve path-generation quality with clearer prerequisite and mastery heuristics.
 - [ ] Make stage purpose, expected outcome, and estimated effort more explicit.
-- [ ] Explore richer path-map relationships and navigation beyond the initial guided map slice.
+- [ ] Map review slice 2: restore and clearly present the learner's saved position on return; separate implementation and human review gate.
+- [ ] Map review slice 3: restrained completion / progress celebration cues; separate implementation and human review gate.
+- [ ] Polish long desktop stage headings and cramped lesson metadata identified in slice 1 visual review.
+- [ ] Explore richer path-map relationships and navigation beyond the map-first sequential lesson spine.
 - [ ] Add stronger learner controls for stage ordering and video selection.
 - [ ] Add progress summaries and a daily learning queue.
 - [ ] Evaluate sharing or collaboration after the individual learning loop is strong.

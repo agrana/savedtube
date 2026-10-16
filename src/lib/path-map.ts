@@ -10,17 +10,32 @@ import {
 import { buildPathWatchHref } from './path-links';
 import type { PathStageWithVideos } from './path-research-schema';
 
-/** Fixed card geometry (px) — shared by map render and layout tests. */
+/**
+ * Fixed geometry (px) for the sequential lesson spine.
+ * Desktop: left-to-right lessons with compact stage headings.
+ * Mobile: top-to-bottom lessons within portrait width (~390px).
+ */
 export const PATH_MAP_GOAL_WIDTH = 240;
-export const PATH_MAP_GOAL_HEIGHT = 72;
-export const PATH_MAP_STAGE_WIDTH = 200;
-export const PATH_MAP_STAGE_HEIGHT = 96;
-export const PATH_MAP_VIDEO_WIDTH = 184;
-export const PATH_MAP_VIDEO_HEIGHT = 68;
-export const PATH_MAP_GAP_X = 40;
-export const PATH_MAP_GAP_Y = 36;
-export const PATH_MAP_PADDING = 24;
-export const PATH_MAP_CONNECTOR_STROKE = 2;
+export const PATH_MAP_GOAL_HEIGHT = 48;
+/** Compact stage heading height — stages are groupings, not large cards. */
+export const PATH_MAP_STAGE_HEIGHT = 32;
+/** Minimum stage-heading width when a stage has no lessons yet. */
+export const PATH_MAP_STAGE_MIN_WIDTH = 120;
+/** Desktop lesson node size — lessons carry visual prominence. */
+export const PATH_MAP_VIDEO_WIDTH = 176;
+export const PATH_MAP_VIDEO_HEIGHT = 80;
+/** Mobile lesson column width; canvas fits a 390px portrait content box with page + map padding. */
+export const PATH_MAP_MOBILE_VIDEO_WIDTH = 286;
+/** Gap between lessons inside a stage (desktop). */
+export const PATH_MAP_GAP_X = 16;
+/** Gap between stage groups (desktop). */
+export const PATH_MAP_STAGE_GROUP_GAP = 28;
+/** Vertical gap: stage heading → lessons, and between mobile lesson rows. */
+export const PATH_MAP_GAP_Y = 12;
+export const PATH_MAP_PADDING = 20;
+export const PATH_MAP_CONNECTOR_STROKE = 1.5;
+/** @deprecated Alias for tests that still name stage column width; equals desktop lesson width. */
+export const PATH_MAP_STAGE_WIDTH = PATH_MAP_VIDEO_WIDTH;
 
 export const PATH_MAP_MAX_STAGES = RESEARCH_MAX_STAGES;
 export const PATH_MAP_MAX_VIDEOS_PER_STAGE = RESEARCH_MAX_VIDEOS_PER_STAGE;
@@ -42,7 +57,17 @@ export type PathMapConnector = {
   y1: number;
   x2: number;
   y2: number;
-  kind: 'goal-to-stage' | 'stage-to-stage' | 'stage-to-video';
+  /** Continuous directional spine between consecutive lessons. */
+  kind: 'lesson-to-lesson';
+};
+
+/** Subtle background grouping behind a stage's heading + lessons. */
+export type PathMapStageBand = {
+  id: string;
+  stageId: string;
+  rect: PathMapRect;
+  isCurrent: boolean;
+  completed: boolean;
 };
 
 export type PathMapGoalNode = {
@@ -181,12 +206,19 @@ export type PathMapLayout = {
   height: number;
   nodes: PathMapNode[];
   connectors: PathMapConnector[];
+  /** Soft stage groupings drawn behind the lesson spine. */
+  bands: PathMapStageBand[];
 };
 
 export type PathPresentation = {
   /** Stable revision fingerprint for reload equality checks. */
   contentKey: string;
   goalNodeId: string;
+  /** Quiet path-title label for the map heading (not a canvas node). */
+  goalLabel: string;
+  /** Goal/context copy shown as the quiet map heading. */
+  goalContext: string;
+  goalAriaLabel: string;
   orderedItems: PathMapOrderedItem[];
   /** Per-stage expansion payloads in presentation order. */
   stages: PathMapStageSummary[];
@@ -439,14 +471,7 @@ function leftCenter(rect: PathMapRect): { x: number; y: number } {
   return { x: rect.x, y: rect.y + rect.height / 2 };
 }
 
-function columnWidth(): number {
-  return Math.max(PATH_MAP_STAGE_WIDTH, PATH_MAP_VIDEO_WIDTH);
-}
-
-function buildDesktopLayout(args: {
-  goalNodeId: string;
-  goalLabel: string;
-  goalAria: string;
+type LessonSpineLayoutArgs = {
   orderedStages: PathStageWithVideos[];
   practiced: Set<string>;
   completed: Set<string>;
@@ -456,362 +481,272 @@ function buildDesktopLayout(args: {
   recommendedPathVideoId: string | null;
   pathId: string;
   buildVideoHref: BuildPathVideoHref;
-}): PathMapLayout {
-  const {
-    goalNodeId,
-    goalLabel,
-    goalAria,
-    orderedStages,
-    practiced,
-    completed,
-    selectedPathVideoId,
-    selectedStageId,
-    currentStageId,
-    recommendedPathVideoId,
-    pathId,
-    buildVideoHref,
-  } = args;
+};
 
-  const colW = columnWidth();
-  const stageCount = orderedStages.length;
-  const maxVideos = orderedStages.reduce(
-    (max, stage) => Math.max(max, stage.videos.length),
-    0
-  );
-
-  const stagesBlockWidth =
-    stageCount === 0
-      ? PATH_MAP_GOAL_WIDTH
-      : stageCount * colW + (stageCount - 1) * PATH_MAP_GAP_X;
-
-  const width =
-    PATH_MAP_PADDING * 2 + Math.max(PATH_MAP_GOAL_WIDTH, stagesBlockWidth);
-
-  const goalX = (width - PATH_MAP_GOAL_WIDTH) / 2;
-  const goalY = PATH_MAP_PADDING;
-  const goalRect: PathMapRect = {
-    x: goalX,
-    y: goalY,
-    width: PATH_MAP_GOAL_WIDTH,
-    height: PATH_MAP_GOAL_HEIGHT,
+function buildStageNode(
+  stage: PathStageWithVideos,
+  stageIndex: number,
+  rect: PathMapRect,
+  args: LessonSpineLayoutArgs
+): PathMapStageNode {
+  const practicedCount = stage.videos.filter((video) =>
+    args.practiced.has(video.id)
+  ).length;
+  const isCurrent = args.currentStageId === stage.id;
+  const stageCompleted = args.completed.has(stage.id);
+  return {
+    kind: 'stage',
+    id: pathMapStageNodeId(stage.id),
+    stageId: stage.id,
+    position: stage.position,
+    label: stage.title,
+    subtitle: stage.learning_objective,
+    objective: stage.learning_objective,
+    ariaLabel: stageAriaLabel(
+      stageIndex,
+      stage.title,
+      stageCompleted,
+      isCurrent
+    ),
+    completed: stageCompleted,
+    selected: args.selectedStageId === stage.id,
+    isCurrent,
+    practicedCount,
+    lessonCount: stage.videos.length,
+    detailsId: pathMapStageDetailsId(stage.id),
+    rect,
   };
-
-  const stagesRowX = (width - stagesBlockWidth) / 2;
-  const stageY = goalY + PATH_MAP_GOAL_HEIGHT + PATH_MAP_GAP_Y;
-  const videoY = stageY + PATH_MAP_STAGE_HEIGHT + PATH_MAP_GAP_Y;
-
-  const nodes: PathMapNode[] = [
-    {
-      kind: 'goal',
-      id: goalNodeId,
-      label: goalLabel,
-      ariaLabel: goalAria,
-      rect: goalRect,
-    },
-  ];
-  const connectors: PathMapConnector[] = [];
-
-  let previousStageNode: PathMapStageNode | null = null;
-
-  orderedStages.forEach((stage, stageIndex) => {
-    const stageNodeId = pathMapStageNodeId(stage.id);
-    const colX = stagesRowX + stageIndex * (colW + PATH_MAP_GAP_X);
-    const stageRect: PathMapRect = {
-      x: colX + (colW - PATH_MAP_STAGE_WIDTH) / 2,
-      y: stageY,
-      width: PATH_MAP_STAGE_WIDTH,
-      height: PATH_MAP_STAGE_HEIGHT,
-    };
-    const practicedCount = stage.videos.filter((video) =>
-      practiced.has(video.id)
-    ).length;
-    const isCurrent = currentStageId === stage.id;
-    const stageCompleted = completed.has(stage.id);
-    const stageNode: PathMapStageNode = {
-      kind: 'stage',
-      id: stageNodeId,
-      stageId: stage.id,
-      position: stage.position,
-      label: stage.title,
-      subtitle: stage.learning_objective,
-      objective: stage.learning_objective,
-      ariaLabel: stageAriaLabel(
-        stageIndex,
-        stage.title,
-        stageCompleted,
-        isCurrent
-      ),
-      completed: stageCompleted,
-      selected: selectedStageId === stage.id,
-      isCurrent,
-      practicedCount,
-      lessonCount: stage.videos.length,
-      detailsId: pathMapStageDetailsId(stage.id),
-      rect: stageRect,
-    };
-    nodes.push(stageNode);
-
-    const fromGoal = bottomCenter(goalRect);
-    const toStage = topCenter(stageRect);
-    connectors.push({
-      id: `connector-goal-${stage.id}`,
-      fromNodeId: goalNodeId,
-      toNodeId: stageNodeId,
-      x1: fromGoal.x,
-      y1: fromGoal.y,
-      x2: toStage.x,
-      y2: toStage.y,
-      kind: 'goal-to-stage',
-    });
-
-    if (previousStageNode) {
-      const from = rightCenter(previousStageNode.rect);
-      const to = leftCenter(stageRect);
-      connectors.push({
-        id: `connector-stage-${previousStageNode.stageId}-${stage.id}`,
-        fromNodeId: previousStageNode.id,
-        toNodeId: stageNodeId,
-        x1: from.x,
-        y1: from.y,
-        x2: to.x,
-        y2: to.y,
-        kind: 'stage-to-stage',
-      });
-    }
-    previousStageNode = stageNode;
-
-    stage.videos.forEach((video, videoIndex) => {
-      const videoNodeId = pathMapVideoNodeId(video.id);
-      const videoRect: PathMapRect = {
-        x: colX + (colW - PATH_MAP_VIDEO_WIDTH) / 2,
-        y: videoY + videoIndex * (PATH_MAP_VIDEO_HEIGHT + PATH_MAP_GAP_Y / 2),
-        width: PATH_MAP_VIDEO_WIDTH,
-        height: PATH_MAP_VIDEO_HEIGHT,
-      };
-      const practicedFlag = practiced.has(video.id);
-      const selected = selectedPathVideoId === video.id;
-      const recommended = recommendedPathVideoId === video.id;
-      nodes.push({
-        kind: 'video',
-        id: videoNodeId,
-        pathVideoId: video.id,
-        stageId: stage.id,
-        youtubeVideoId: video.youtube_video_id,
-        position: video.position,
-        label: video.title,
-        channelTitle: video.channel_title,
-        ariaLabel: videoAriaLabel(
-          video.title,
-          practicedFlag,
-          selected,
-          recommended
-        ),
-        href: buildVideoHref(video.youtube_video_id, pathId, video.id),
-        practiced: practicedFlag,
-        selected,
-        recommended,
-        rect: videoRect,
-      });
-
-      const fromStage = bottomCenter(stageRect);
-      const toVideo = topCenter(videoRect);
-      connectors.push({
-        id: `connector-video-${video.id}`,
-        fromNodeId: stageNodeId,
-        toNodeId: videoNodeId,
-        x1: fromStage.x,
-        y1: fromStage.y,
-        x2: toVideo.x,
-        y2: toVideo.y,
-        kind: 'stage-to-video',
-      });
-    });
-  });
-
-  const height =
-    PATH_MAP_PADDING * 2 +
-    PATH_MAP_GOAL_HEIGHT +
-    (stageCount > 0 ? PATH_MAP_GAP_Y + PATH_MAP_STAGE_HEIGHT : 0) +
-    (maxVideos > 0
-      ? PATH_MAP_GAP_Y +
-        maxVideos * PATH_MAP_VIDEO_HEIGHT +
-        Math.max(0, maxVideos - 1) * (PATH_MAP_GAP_Y / 2)
-      : 0);
-
-  return { width, height, nodes, connectors };
 }
 
-function buildMobileLayout(args: {
-  goalNodeId: string;
-  goalLabel: string;
-  goalAria: string;
-  orderedStages: PathStageWithVideos[];
-  practiced: Set<string>;
-  completed: Set<string>;
-  selectedPathVideoId: string | null;
-  selectedStageId: string | null;
-  currentStageId: string | null;
-  recommendedPathVideoId: string | null;
-  pathId: string;
-  buildVideoHref: BuildPathVideoHref;
-}): PathMapLayout {
-  const {
-    goalNodeId,
-    goalLabel,
-    goalAria,
-    orderedStages,
-    practiced,
-    completed,
-    selectedPathVideoId,
-    selectedStageId,
-    currentStageId,
-    recommendedPathVideoId,
-    pathId,
-    buildVideoHref,
-  } = args;
-
-  const contentWidth = Math.max(
-    PATH_MAP_GOAL_WIDTH,
-    PATH_MAP_STAGE_WIDTH,
-    PATH_MAP_VIDEO_WIDTH
-  );
-  const width = PATH_MAP_PADDING * 2 + contentWidth;
-  let cursorY = PATH_MAP_PADDING;
-
-  const goalRect: PathMapRect = {
-    x: (width - PATH_MAP_GOAL_WIDTH) / 2,
-    y: cursorY,
-    width: PATH_MAP_GOAL_WIDTH,
-    height: PATH_MAP_GOAL_HEIGHT,
+function buildVideoNode(
+  video: PathStageWithVideos['videos'][number],
+  rect: PathMapRect,
+  args: LessonSpineLayoutArgs
+): PathMapVideoNode {
+  const practicedFlag = args.practiced.has(video.id);
+  const selected = args.selectedPathVideoId === video.id;
+  const recommended = args.recommendedPathVideoId === video.id;
+  return {
+    kind: 'video',
+    id: pathMapVideoNodeId(video.id),
+    pathVideoId: video.id,
+    stageId: video.stage_id,
+    youtubeVideoId: video.youtube_video_id,
+    position: video.position,
+    label: video.title,
+    channelTitle: video.channel_title,
+    ariaLabel: videoAriaLabel(
+      video.title,
+      practicedFlag,
+      selected,
+      recommended
+    ),
+    href: args.buildVideoHref(
+      video.youtube_video_id,
+      args.pathId,
+      video.id
+    ),
+    practiced: practicedFlag,
+    selected,
+    recommended,
+    rect,
   };
-  cursorY += PATH_MAP_GOAL_HEIGHT + PATH_MAP_GAP_Y;
+}
 
-  const nodes: PathMapNode[] = [
-    {
-      kind: 'goal',
-      id: goalNodeId,
-      label: goalLabel,
-      ariaLabel: goalAria,
-      rect: goalRect,
-    },
-  ];
-  const connectors: PathMapConnector[] = [];
-  let previousNodeRect = goalRect;
-  let previousNodeId = goalNodeId;
-
-  orderedStages.forEach((stage, stageIndex) => {
-    const stageNodeId = pathMapStageNodeId(stage.id);
-    const stageRect: PathMapRect = {
-      x: (width - PATH_MAP_STAGE_WIDTH) / 2,
-      y: cursorY,
-      width: PATH_MAP_STAGE_WIDTH,
-      height: PATH_MAP_STAGE_HEIGHT,
-    };
-    const practicedCount = stage.videos.filter((video) =>
-      practiced.has(video.id)
-    ).length;
-    const isCurrent = currentStageId === stage.id;
-    const stageCompleted = completed.has(stage.id);
-    nodes.push({
-      kind: 'stage',
-      id: stageNodeId,
-      stageId: stage.id,
-      position: stage.position,
-      label: stage.title,
-      subtitle: stage.learning_objective,
-      objective: stage.learning_objective,
-      ariaLabel: stageAriaLabel(
-        stageIndex,
-        stage.title,
-        stageCompleted,
-        isCurrent
-      ),
-      completed: stageCompleted,
-      selected: selectedStageId === stage.id,
-      isCurrent,
-      practicedCount,
-      lessonCount: stage.videos.length,
-      detailsId: pathMapStageDetailsId(stage.id),
-      rect: stageRect,
-    });
-
-    const from = bottomCenter(previousNodeRect);
-    const to = topCenter(stageRect);
+function pushLessonSpineConnector(
+  connectors: PathMapConnector[],
+  previous: PathMapVideoNode | null,
+  next: PathMapVideoNode,
+  orientation: 'horizontal' | 'vertical'
+): PathMapVideoNode {
+  if (previous) {
+    const from =
+      orientation === 'horizontal'
+        ? rightCenter(previous.rect)
+        : bottomCenter(previous.rect);
+    const to =
+      orientation === 'horizontal'
+        ? leftCenter(next.rect)
+        : topCenter(next.rect);
     connectors.push({
-      id: `mobile-connector-${previousNodeId}-${stageNodeId}`,
-      fromNodeId: previousNodeId,
-      toNodeId: stageNodeId,
+      id: `connector-lesson-${previous.pathVideoId}-${next.pathVideoId}`,
+      fromNodeId: previous.id,
+      toNodeId: next.id,
       x1: from.x,
       y1: from.y,
       x2: to.x,
       y2: to.y,
-      kind: previousNodeId === goalNodeId ? 'goal-to-stage' : 'stage-to-stage',
+      kind: 'lesson-to-lesson',
+    });
+  }
+  return next;
+}
+
+/**
+ * Desktop: left-to-right sequential lesson spine with compact stage headings.
+ * Goal is a quiet heading outside the canvas — no fan-out tree.
+ */
+function buildDesktopLayout(args: LessonSpineLayoutArgs): PathMapLayout {
+  const { orderedStages } = args;
+  const nodes: PathMapNode[] = [];
+  const connectors: PathMapConnector[] = [];
+  const bands: PathMapStageBand[] = [];
+
+  if (orderedStages.length === 0) {
+    return {
+      width: PATH_MAP_PADDING * 2 + PATH_MAP_STAGE_MIN_WIDTH,
+      height: PATH_MAP_PADDING * 2,
+      nodes,
+      connectors,
+      bands,
+    };
+  }
+
+  const stageY = PATH_MAP_PADDING;
+  const lessonY = stageY + PATH_MAP_STAGE_HEIGHT + PATH_MAP_GAP_Y;
+  const bandPad = 8;
+  let cursorX = PATH_MAP_PADDING;
+  let previousLesson: PathMapVideoNode | null = null;
+
+  orderedStages.forEach((stage, stageIndex) => {
+    const lessonCount = stage.videos.length;
+    const groupWidth =
+      lessonCount === 0
+        ? PATH_MAP_STAGE_MIN_WIDTH
+        : lessonCount * PATH_MAP_VIDEO_WIDTH +
+          Math.max(0, lessonCount - 1) * PATH_MAP_GAP_X;
+
+    const stageRect: PathMapRect = {
+      x: cursorX,
+      y: stageY,
+      width: groupWidth,
+      height: PATH_MAP_STAGE_HEIGHT,
+    };
+    nodes.push(buildStageNode(stage, stageIndex, stageRect, args));
+
+    const bandHeight =
+      PATH_MAP_STAGE_HEIGHT +
+      PATH_MAP_GAP_Y +
+      (lessonCount > 0 ? PATH_MAP_VIDEO_HEIGHT : 0);
+    bands.push({
+      id: `band-${stage.id}`,
+      stageId: stage.id,
+      rect: {
+        x: cursorX - bandPad / 2,
+        y: stageY - bandPad / 2,
+        width: groupWidth + bandPad,
+        height: bandHeight + bandPad,
+      },
+      isCurrent: args.currentStageId === stage.id,
+      completed: args.completed.has(stage.id),
     });
 
-    previousNodeRect = stageRect;
-    previousNodeId = stageNodeId;
-    cursorY += PATH_MAP_STAGE_HEIGHT + PATH_MAP_GAP_Y / 2;
-
-    stage.videos.forEach((video) => {
-      const videoNodeId = pathMapVideoNodeId(video.id);
+    stage.videos.forEach((video, videoIndex) => {
       const videoRect: PathMapRect = {
-        x: (width - PATH_MAP_VIDEO_WIDTH) / 2,
-        y: cursorY,
+        x: cursorX + videoIndex * (PATH_MAP_VIDEO_WIDTH + PATH_MAP_GAP_X),
+        y: lessonY,
         width: PATH_MAP_VIDEO_WIDTH,
         height: PATH_MAP_VIDEO_HEIGHT,
       };
-      const practicedFlag = practiced.has(video.id);
-      const selected = selectedPathVideoId === video.id;
-      const recommended = recommendedPathVideoId === video.id;
-      nodes.push({
-        kind: 'video',
-        id: videoNodeId,
-        pathVideoId: video.id,
-        stageId: stage.id,
-        youtubeVideoId: video.youtube_video_id,
-        position: video.position,
-        label: video.title,
-        channelTitle: video.channel_title,
-        ariaLabel: videoAriaLabel(
-          video.title,
-          practicedFlag,
-          selected,
-          recommended
-        ),
-        href: buildVideoHref(video.youtube_video_id, pathId, video.id),
-        practiced: practicedFlag,
-        selected,
-        recommended,
-        rect: videoRect,
-      });
-
-      const fromStage = bottomCenter(previousNodeRect);
-      const toVideo = topCenter(videoRect);
-      connectors.push({
-        id: `mobile-connector-${video.id}`,
-        fromNodeId: previousNodeId,
-        toNodeId: videoNodeId,
-        x1: fromStage.x,
-        y1: fromStage.y,
-        x2: toVideo.x,
-        y2: toVideo.y,
-        kind: 'stage-to-video',
-      });
-
-      previousNodeRect = videoRect;
-      previousNodeId = videoNodeId;
-      cursorY += PATH_MAP_VIDEO_HEIGHT + PATH_MAP_GAP_Y / 2;
+      const videoNode = buildVideoNode(video, videoRect, args);
+      nodes.push(videoNode);
+      previousLesson = pushLessonSpineConnector(
+        connectors,
+        previousLesson,
+        videoNode,
+        'horizontal'
+      );
     });
 
-    cursorY += PATH_MAP_GAP_Y / 2;
+    cursorX += groupWidth + PATH_MAP_STAGE_GROUP_GAP;
+  });
+
+  const width = cursorX - PATH_MAP_STAGE_GROUP_GAP + PATH_MAP_PADDING;
+  const height =
+    PATH_MAP_PADDING * 2 +
+    PATH_MAP_STAGE_HEIGHT +
+    PATH_MAP_GAP_Y +
+    PATH_MAP_VIDEO_HEIGHT;
+
+  return { width, height, nodes, connectors, bands };
+}
+
+/**
+ * Mobile: top-to-bottom sequential lesson spine within portrait width.
+ */
+function buildMobileLayout(args: LessonSpineLayoutArgs): PathMapLayout {
+  const { orderedStages } = args;
+  const lessonWidth = PATH_MAP_MOBILE_VIDEO_WIDTH;
+  const width = PATH_MAP_PADDING * 2 + lessonWidth;
+  const nodes: PathMapNode[] = [];
+  const connectors: PathMapConnector[] = [];
+  const bands: PathMapStageBand[] = [];
+  const bandPad = 8;
+  let cursorY = PATH_MAP_PADDING;
+  let previousLesson: PathMapVideoNode | null = null;
+
+  if (orderedStages.length === 0) {
+    return {
+      width,
+      height: PATH_MAP_PADDING * 2,
+      nodes,
+      connectors,
+      bands,
+    };
+  }
+
+  orderedStages.forEach((stage, stageIndex) => {
+    const stageStartY = cursorY;
+    const stageRect: PathMapRect = {
+      x: PATH_MAP_PADDING,
+      y: cursorY,
+      width: lessonWidth,
+      height: PATH_MAP_STAGE_HEIGHT,
+    };
+    nodes.push(buildStageNode(stage, stageIndex, stageRect, args));
+    cursorY += PATH_MAP_STAGE_HEIGHT + PATH_MAP_GAP_Y;
+
+    stage.videos.forEach((video) => {
+      const videoRect: PathMapRect = {
+        x: PATH_MAP_PADDING,
+        y: cursorY,
+        width: lessonWidth,
+        height: PATH_MAP_VIDEO_HEIGHT,
+      };
+      const videoNode = buildVideoNode(video, videoRect, args);
+      nodes.push(videoNode);
+      previousLesson = pushLessonSpineConnector(
+        connectors,
+        previousLesson,
+        videoNode,
+        'vertical'
+      );
+      cursorY += PATH_MAP_VIDEO_HEIGHT + PATH_MAP_GAP_Y;
+    });
+
+    const bandBottom = cursorY - PATH_MAP_GAP_Y;
+    bands.push({
+      id: `band-${stage.id}`,
+      stageId: stage.id,
+      rect: {
+        x: PATH_MAP_PADDING - bandPad / 2,
+        y: stageStartY - bandPad / 2,
+        width: lessonWidth + bandPad,
+        height: bandBottom - stageStartY + bandPad,
+      },
+      isCurrent: args.currentStageId === stage.id,
+      completed: args.completed.has(stage.id),
+    });
+
+    cursorY += PATH_MAP_STAGE_GROUP_GAP - PATH_MAP_GAP_Y;
   });
 
   const height = Math.max(
-    cursorY + PATH_MAP_PADDING - PATH_MAP_GAP_Y / 2,
-    PATH_MAP_PADDING * 2 + PATH_MAP_GOAL_HEIGHT
+    cursorY - PATH_MAP_STAGE_GROUP_GAP + PATH_MAP_PADDING + PATH_MAP_GAP_Y,
+    PATH_MAP_PADDING * 2
   );
 
-  return { width, height, nodes, connectors };
+  return { width, height, nodes, connectors, bands };
 }
 
 /**
@@ -838,7 +773,8 @@ export function buildPathPresentation(
 
   const goalNodeId = pathMapGoalNodeId(input.pathId);
   const goalLabel = input.pathTitle.trim() || 'Learning path';
-  const goalAria = `Path goal: ${input.goal.trim() || goalLabel}`;
+  const goalContext = input.goal.trim() || goalLabel;
+  const goalAriaLabel = `Path goal: ${goalContext}`;
 
   const recommendedNext = resolveRecommendedNextLesson(
     cappedStages,
@@ -903,7 +839,7 @@ export function buildPathPresentation(
       kind: 'goal',
       id: goalNodeId,
       label: goalLabel,
-      ariaLabel: goalAria,
+      ariaLabel: goalAriaLabel,
     },
   ];
 
@@ -949,10 +885,7 @@ export function buildPathPresentation(
     }
   }
 
-  const layoutArgs = {
-    goalNodeId,
-    goalLabel,
-    goalAria,
+  const layoutArgs: LessonSpineLayoutArgs = {
     orderedStages: cappedStages,
     practiced,
     completed,
@@ -976,6 +909,9 @@ export function buildPathPresentation(
   return {
     contentKey: `${input.pathId}::${contentKey}`,
     goalNodeId,
+    goalLabel,
+    goalContext,
+    goalAriaLabel,
     orderedItems,
     stages,
     recommendedNext,

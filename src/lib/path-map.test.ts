@@ -6,12 +6,13 @@ import { fileURLToPath } from 'node:url';
 import {
   buildPathPresentation,
   compareByPositionThenId,
-  PATH_MAP_GOAL_HEIGHT,
-  PATH_MAP_GOAL_WIDTH,
+  PATH_MAP_GAP_X,
   PATH_MAP_MAX_STAGES,
   PATH_MAP_MAX_VIDEOS_PER_STAGE,
+  PATH_MAP_MOBILE_VIDEO_WIDTH,
+  PATH_MAP_PADDING,
+  PATH_MAP_STAGE_GROUP_GAP,
   PATH_MAP_STAGE_HEIGHT,
-  PATH_MAP_STAGE_WIDTH,
   PATH_MAP_VIDEO_HEIGHT,
   PATH_MAP_VIDEO_WIDTH,
   pathMapGoalNodeId,
@@ -174,6 +175,7 @@ describe('path-map ordering', () => {
       stages,
     });
 
+    assert.equal(presentation.goalContext, 'Pass CKA');
     assert.deepEqual(
       presentation.orderedItems.map((item) => item.id),
       [
@@ -185,15 +187,20 @@ describe('path-map ordering', () => {
       ]
     );
 
-    const desktopIds = presentation.desktop.nodes.map((node) => node.id);
-    const mobileIds = presentation.mobile.nodes.map((node) => node.id);
+    // Canvas is a sequential lesson spine: stages + lessons, no goal node.
+    const spineIds = [
+      pathMapStageNodeId('stage-1'),
+      pathMapVideoNodeId('video-1'),
+      pathMapStageNodeId('stage-2'),
+      pathMapVideoNodeId('video-2'),
+    ];
     assert.deepEqual(
-      desktopIds,
-      presentation.orderedItems.map((item) => item.id)
+      presentation.desktop.nodes.map((node) => node.id),
+      spineIds
     );
     assert.deepEqual(
-      mobileIds,
-      presentation.orderedItems.map((item) => item.id)
+      presentation.mobile.nodes.map((node) => node.id),
+      spineIds
     );
   });
 });
@@ -223,6 +230,7 @@ describe('path-map stable ids and deterministic layout', () => {
     });
 
     assert.equal(presentation.goalNodeId, pathMapGoalNodeId(PATH_ID));
+    assert.equal(presentation.goalContext, 'Goal text');
     assert.ok(
       presentation.desktop.nodes.some(
         (node) => node.id === pathMapStageNodeId(stageId)
@@ -232,6 +240,10 @@ describe('path-map stable ids and deterministic layout', () => {
       presentation.desktop.nodes.some(
         (node) => node.id === pathMapVideoNodeId(videoId)
       )
+    );
+    assert.equal(
+      presentation.desktop.nodes.some((node) => node.kind === 'goal'),
+      false
     );
 
     const again = buildPathPresentation({
@@ -258,7 +270,7 @@ describe('path-map stable ids and deterministic layout', () => {
     assert.deepEqual(again.mobile, presentation.mobile);
   });
 
-  it('uses fixed card geometry on desktop nodes', () => {
+  it('uses compact stage headings and prominent lesson geometry', () => {
     const stages = maxSizedStages().slice(0, 1);
     const presentation = buildPathPresentation({
       pathId: PATH_ID,
@@ -266,27 +278,22 @@ describe('path-map stable ids and deterministic layout', () => {
       goal: 'Goal',
       stages,
     });
-    const goal = presentation.desktop.nodes.find(
-      (node) => node.kind === 'goal'
-    );
     const stage = presentation.desktop.nodes.find(
       (node) => node.kind === 'stage'
     );
     const video = presentation.desktop.nodes.find(
       (node) => node.kind === 'video'
     );
-    assert.ok(goal);
     assert.ok(stage);
     assert.ok(video);
-    assert.equal(goal.rect.width, PATH_MAP_GOAL_WIDTH);
-    assert.equal(goal.rect.height, PATH_MAP_GOAL_HEIGHT);
-    assert.equal(stage.rect.width, PATH_MAP_STAGE_WIDTH);
     assert.equal(stage.rect.height, PATH_MAP_STAGE_HEIGHT);
+    assert.ok(stage.rect.height < PATH_MAP_VIDEO_HEIGHT);
     assert.equal(video.rect.width, PATH_MAP_VIDEO_WIDTH);
     assert.equal(video.rect.height, PATH_MAP_VIDEO_HEIGHT);
+    assert.equal(presentation.desktop.bands.length, 1);
   });
 
-  it('keeps connector endpoints attached to node edges', () => {
+  it('keeps lesson-to-lesson spine connectors attached to lesson edges', () => {
     const stages = maxSizedStages().slice(0, 2);
     const presentation = buildPathPresentation({
       pathId: PATH_ID,
@@ -297,22 +304,47 @@ describe('path-map stable ids and deterministic layout', () => {
     const byId = new Map(
       presentation.desktop.nodes.map((node) => [node.id, node])
     );
+    assert.ok(presentation.desktop.connectors.length >= 1);
     for (const connector of presentation.desktop.connectors) {
+      assert.equal(connector.kind, 'lesson-to-lesson');
       const from = byId.get(connector.fromNodeId);
       const to = byId.get(connector.toNodeId);
-      assert.ok(from, connector.fromNodeId);
-      assert.ok(to, connector.toNodeId);
-      assert.ok(
-        connector.y1 <= connector.y2 || connector.kind === 'stage-to-stage'
-      );
-      assert.notEqual(connector.x1, undefined);
-      assert.notEqual(connector.x2, undefined);
+      assert.ok(from && from.kind === 'video', connector.fromNodeId);
+      assert.ok(to && to.kind === 'video', connector.toNodeId);
+      assert.equal(connector.y1, connector.y2);
+      assert.ok(connector.x1 < connector.x2);
     }
+  });
+
+  it('fits an ordinary three-stage desktop spine within 1280px content width', () => {
+    const stages = maxSizedStages().slice(0, 3);
+    const presentation = buildPathPresentation({
+      pathId: PATH_ID,
+      pathTitle: 'Three stages',
+      goal: 'Goal',
+      stages,
+    });
+    const contentWidthAt1280 = 1280 - 64;
+    const lessonCount = stages.reduce(
+      (sum, stage) => sum + stage.videos.length,
+      0
+    );
+    const expectedWidth =
+      PATH_MAP_PADDING * 2 +
+      lessonCount * PATH_MAP_VIDEO_WIDTH +
+      (lessonCount - stages.length) * PATH_MAP_GAP_X +
+      (stages.length - 1) * PATH_MAP_STAGE_GROUP_GAP;
+    assert.equal(presentation.desktop.width, expectedWidth);
+    assert.ok(presentation.desktop.width <= contentWidthAt1280);
+    assert.ok(
+      presentation.mobile.width <=
+        PATH_MAP_PADDING * 2 + PATH_MAP_MOBILE_VIDEO_WIDTH
+    );
   });
 });
 
 describe('path-map empty / small / max handling', () => {
-  it('handles an empty path with only the goal node', () => {
+  it('handles an empty path with goal context and no spine nodes', () => {
     const presentation = buildPathPresentation({
       pathId: PATH_ID,
       pathTitle: 'Empty',
@@ -323,9 +355,10 @@ describe('path-map empty / small / max handling', () => {
     assert.equal(presentation.videoCount, 0);
     assert.equal(presentation.orderedItems.length, 1);
     assert.equal(presentation.orderedItems[0].kind, 'goal');
-    assert.equal(presentation.desktop.nodes.length, 1);
+    assert.equal(presentation.goalContext, 'Learn anything');
+    assert.equal(presentation.desktop.nodes.length, 0);
     assert.equal(presentation.desktop.connectors.length, 0);
-    assert.equal(presentation.mobile.nodes.length, 1);
+    assert.equal(presentation.mobile.nodes.length, 0);
   });
 
   it('handles a small path (one stage, one video)', () => {
@@ -417,10 +450,20 @@ describe('path-map empty / small / max handling', () => {
       presentation.videoCount,
       PATH_MAP_MAX_STAGES * PATH_MAP_MAX_VIDEOS_PER_STAGE
     );
-    assert.ok(presentation.desktop.width > PATH_MAP_GOAL_WIDTH);
-    assert.ok(presentation.desktop.height > PATH_MAP_GOAL_HEIGHT);
-    assert.ok(presentation.desktop.connectors.length > 0);
-    assert.ok(presentation.mobile.height > presentation.desktop.height / 2);
+    assert.ok(presentation.desktop.width > PATH_MAP_VIDEO_WIDTH);
+    assert.ok(
+      presentation.desktop.height >=
+        PATH_MAP_PADDING * 2 + PATH_MAP_STAGE_HEIGHT + PATH_MAP_VIDEO_HEIGHT
+    );
+    assert.equal(
+      presentation.desktop.connectors.length,
+      PATH_MAP_MAX_STAGES * PATH_MAP_MAX_VIDEOS_PER_STAGE - 1
+    );
+    assert.ok(presentation.mobile.height > presentation.desktop.height);
+    assert.ok(
+      presentation.mobile.width <=
+        PATH_MAP_PADDING * 2 + PATH_MAP_MOBILE_VIDEO_WIDTH
+    );
   });
 });
 
@@ -468,6 +511,13 @@ describe('path-map accessibility structure', () => {
     );
     assert.equal(a11y.mapHasConnectors, true);
     assert.deepEqual(a11y.desktopNodeIds, a11y.mobileNodeIds);
+    assert.equal(
+      a11y.desktopNodeIds.some((id) => id.startsWith('path-map-goal-')),
+      false
+    );
+    assert.ok(
+      a11y.desktopNodeIds.some((id) => id.startsWith('path-map-video-'))
+    );
   });
 
   it('PathMap component derives content from the presentation contract', () => {
@@ -484,6 +534,9 @@ describe('path-map accessibility structure', () => {
     assert.match(source, /detailsInOrderedList/);
     assert.match(source, /detailsUnderMap/);
     assert.match(source, /includeDetails=\{detailsInOrderedList\}/);
+    assert.match(source, /sr-only/);
+    assert.match(source, /goalContext/);
+    assert.match(source, /layout\.bands/);
     assert.match(source, /<ol/);
     assert.match(source, /focus-visible:ring/);
     assert.match(source, /motion-reduce:transition-none/);
@@ -493,6 +546,7 @@ describe('path-map accessibility structure', () => {
     assert.equal(source.includes('role="img"'), false);
     assert.equal(source.includes('fetch('), false);
     assert.equal(/openai|anthropic|generateText|llm/i.test(source), false);
+    assert.equal(source.includes('allLessonsPracticed'), false);
   });
 
   it('path detail wires practiced, completion, and continue selection into PathMap', () => {
@@ -534,6 +588,13 @@ describe('path-map accessibility structure', () => {
     assert.match(source, /hashchange/);
     assert.match(source, /resolveDemoLandingVideoFromHash/);
     assert.equal(source.includes('if (!fromHash)'), false);
+    assert.equal(source.includes('lg:grid-cols-'), false);
+    assert.match(source, /space-y-10/);
+    assert.match(source, /id="demo-player"/);
+    const mapIndex = source.indexOf('<PathMap');
+    const playerIndex = source.indexOf('id="demo-player"');
+    assert.ok(mapIndex > 0);
+    assert.ok(playerIndex > mapIndex);
   });
 });
 
@@ -614,19 +675,15 @@ describe('path-map stage expansion contract', () => {
     ]);
 
     assert.deepEqual(
-      presentation.desktop.nodes
-        .filter((node) => node.kind !== 'goal')
-        .map((node) =>
-          node.kind === 'stage' ? node.stageId : node.pathVideoId
-        ),
+      presentation.desktop.nodes.map((node) =>
+        node.kind === 'stage' ? node.stageId : node.pathVideoId
+      ),
       orderedStageAndVideoIds
     );
     assert.deepEqual(
-      presentation.mobile.nodes
-        .filter((node) => node.kind !== 'goal')
-        .map((node) =>
-          node.kind === 'stage' ? node.stageId : node.pathVideoId
-        ),
+      presentation.mobile.nodes.map((node) =>
+        node.kind === 'stage' ? node.stageId : node.pathVideoId
+      ),
       orderedStageAndVideoIds
     );
   });
