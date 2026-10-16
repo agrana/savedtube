@@ -262,6 +262,26 @@ export function parseDemoLandingVideoHash(
   return pathVideoId.length > 0 ? pathVideoId : null;
 }
 
+/**
+ * Resolve the demo landing player selection from a URL hash.
+ * Empty hashes restore the fixture's initial playable lesson;
+ * valid `#demo-video-*` hashes select that lesson when still playable;
+ * non-demo non-empty hashes return null so the caller can keep its selection.
+ */
+export function resolveDemoLandingVideoFromHash(
+  fixture: DemoPathFixture,
+  hash: string | null | undefined
+): DemoPathVideo | null {
+  if (hash == null || hash === '' || hash === '#') {
+    return resolveInitialDemoVideo(fixture);
+  }
+  const preferredPathVideoId = parseDemoLandingVideoHash(hash);
+  if (preferredPathVideoId == null) {
+    return null;
+  }
+  return resolveInitialDemoVideo(fixture, preferredPathVideoId);
+}
+
 export function getDemoPathFixture(
   fixture: DemoPathFixture = DEMO_PATH_FIXTURE
 ): DemoPathFixture {

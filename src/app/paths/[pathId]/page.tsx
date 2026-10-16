@@ -800,6 +800,9 @@ export default function PathDetailPage() {
                 selectedPathVideoId={
                   pageState.progress?.continueTarget?.pathVideoId || null
                 }
+                selectedStageId={
+                  pageState.progress?.continueTarget?.stageId || null
+                }
                 listHeading="Accessible path sequence"
               />
             </section>

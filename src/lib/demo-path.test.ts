@@ -22,6 +22,7 @@ import {
   parseDemoLandingVideoHash,
   refreshDemoPathMetadata,
   refreshDemoVideoMetadata,
+  resolveDemoLandingVideoFromHash,
   resolveInitialDemoVideo,
   toDemoPresentationStages,
 } from './demo-path.ts';
@@ -183,6 +184,65 @@ describe('demo follow helpers', () => {
     assert.equal(
       adjacentDemoVideo(DEMO_PATH_FIXTURE, first.id, 'previous'),
       null
+    );
+  });
+
+  it('resolves empty and demo-video hashes without resetting on other anchors', () => {
+    const initial = resolveInitialDemoVideo(DEMO_PATH_FIXTURE);
+    assert.ok(initial);
+    const playable = getPlayableDemoVideos(DEMO_PATH_FIXTURE);
+    assert.ok(playable.length > 1);
+    const later = playable[1];
+    assert.ok(later);
+
+    assert.equal(
+      resolveDemoLandingVideoFromHash(DEMO_PATH_FIXTURE, '')?.id,
+      initial.id
+    );
+    assert.equal(
+      resolveDemoLandingVideoFromHash(DEMO_PATH_FIXTURE, '#')?.id,
+      initial.id
+    );
+    assert.equal(
+      resolveDemoLandingVideoFromHash(DEMO_PATH_FIXTURE, null)?.id,
+      initial.id
+    );
+    assert.equal(
+      resolveDemoLandingVideoFromHash(DEMO_PATH_FIXTURE, undefined)?.id,
+      initial.id
+    );
+    assert.equal(
+      resolveDemoLandingVideoFromHash(DEMO_PATH_FIXTURE, '#demo-player'),
+      null
+    );
+    assert.equal(
+      resolveDemoLandingVideoFromHash(DEMO_PATH_FIXTURE, '#other-section'),
+      null
+    );
+    assert.equal(
+      resolveDemoLandingVideoFromHash(
+        DEMO_PATH_FIXTURE,
+        buildDemoLandingHref(later.id)
+      )?.id,
+      later.id
+    );
+    assert.equal(
+      resolveDemoLandingVideoFromHash(
+        DEMO_PATH_FIXTURE,
+        `#demo-video-${later.id}`
+      )?.id,
+      later.id
+    );
+
+    const unavailable = markDemoVideoUnavailable(DEMO_PATH_FIXTURE, later.id);
+    const unavailableFallback = resolveInitialDemoVideo(unavailable);
+    assert.ok(unavailableFallback);
+    assert.equal(
+      resolveDemoLandingVideoFromHash(
+        unavailable,
+        buildDemoLandingHref(later.id)
+      )?.id,
+      unavailableFallback.id
     );
   });
 

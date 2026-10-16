@@ -15,9 +15,13 @@ import {
   PATH_MAP_VIDEO_HEIGHT,
   PATH_MAP_VIDEO_WIDTH,
   pathMapGoalNodeId,
+  pathMapLayoutDomId,
+  pathMapStageDetailsId,
   pathMapStageNodeId,
   pathMapVideoNodeId,
   pathPresentationA11yStructure,
+  resolvePathMapExpandedStageId,
+  resolveRecommendedNextLesson,
   sortStagesForPresentation,
 } from './path-map.ts';
 import type {
@@ -421,7 +425,7 @@ describe('path-map empty / small / max handling', () => {
 });
 
 describe('path-map accessibility structure', () => {
-  it('exposes labeled ordered items and keyboard-focusable video targets', () => {
+  it('exposes labeled ordered items and keyboard-focusable stage/video targets', () => {
     const stages = maxSizedStages().slice(0, 2);
     const withStates = buildPathPresentation({
       pathId: PATH_ID,
@@ -450,6 +454,18 @@ describe('path-map accessibility structure', () => {
 
     const stageItems = a11y.items.filter((item) => item.kind === 'stage');
     assert.match(stageItems[0].ariaLabel, /completed/);
+    for (const stage of stageItems) {
+      assert.equal(stage.tabIndexHint, 0);
+      assert.ok(stage.detailsId);
+      assert.equal(
+        stage.detailsId,
+        pathMapStageDetailsId(stage.id.slice('path-map-stage-'.length))
+      );
+    }
+    assert.deepEqual(
+      a11y.stageDetailsIds,
+      withStates.stages.map((stage) => stage.detailsId)
+    );
     assert.equal(a11y.mapHasConnectors, true);
     assert.deepEqual(a11y.desktopNodeIds, a11y.mobileNodeIds);
   });
@@ -460,16 +476,26 @@ describe('path-map accessibility structure', () => {
       'utf8'
     );
     assert.match(source, /buildPathPresentation/);
-    assert.match(source, /role="img"/);
+    assert.match(source, /resolvePathMapExpandedStageId/);
+    assert.match(source, /pathMapLayoutDomId/);
+    assert.match(source, /aria-expanded=/);
+    assert.match(source, /aria-controls=/);
+    assert.match(source, /hidden=\{!expanded\}/);
+    assert.match(source, /detailsInOrderedList/);
+    assert.match(source, /detailsUnderMap/);
+    assert.match(source, /includeDetails=\{detailsInOrderedList\}/);
     assert.match(source, /<ol/);
     assert.match(source, /focus-visible:ring/);
+    assert.match(source, /motion-reduce:transition-none/);
     assert.match(source, /href=\{node\.href\}/);
-    assert.match(source, /href=\{item\.href\}/);
+    assert.match(source, /href=\{lesson\.href\}/);
+    assert.match(source, /href=\{stage\.primaryAction\.href\}/);
+    assert.equal(source.includes('role="img"'), false);
     assert.equal(source.includes('fetch('), false);
     assert.equal(/openai|anthropic|generateText|llm/i.test(source), false);
   });
 
-  it('path detail wires map and edit list to the same stages state', () => {
+  it('path detail wires practiced, completion, and continue selection into PathMap', () => {
     const source = readFileSync(
       join(root, 'src/app/paths/[pathId]/page.tsx'),
       'utf8'
@@ -477,6 +503,390 @@ describe('path-map accessibility structure', () => {
     assert.match(source, /import PathMap from '@\/components\/PathMap'/);
     assert.match(source, /<PathMap/);
     assert.match(source, /stages=\{pageState\.stages\}/);
+    assert.match(
+      source,
+      /practicedVideoIds=\{pageState\.progress\?\.practicedVideoIds/
+    );
+    assert.match(
+      source,
+      /completedStageIds=\{pageState\.progress\?\.completedStageIds/
+    );
+    assert.match(
+      source,
+      /selectedPathVideoId=\{\s*pageState\.progress\?\.continueTarget\?\.pathVideoId/
+    );
+    assert.match(
+      source,
+      /selectedStageId=\{\s*pageState\.progress\?\.continueTarget\?\.stageId/
+    );
     assert.match(source, /data\.stages/);
+  });
+
+  it('demo landing keeps inline selection and selected stage wiring', () => {
+    const source = readFileSync(
+      join(root, 'src/components/DemoPathLanding.tsx'),
+      'utf8'
+    );
+    assert.match(source, /selectedStageId: selectedVideo\?\.stageId/);
+    assert.match(source, /onVideoSelect=/);
+    assert.match(source, /window\.location\.hash = desiredHash/);
+    assert.equal(source.includes('replaceState'), false);
+    assert.match(source, /hashchange/);
+    assert.match(source, /resolveDemoLandingVideoFromHash/);
+    assert.equal(source.includes('if (!fromHash)'), false);
+  });
+});
+
+describe('path-map stage expansion contract', () => {
+  function twoStageFixture(): PathStageWithVideos[] {
+    return [
+      makeStage({
+        id: 'stage-1',
+        position: 0,
+        title: 'Foundations',
+        learning_objective: 'Build foundations',
+        videos: [
+          makeVideo({
+            id: 'video-1a',
+            stage_id: 'stage-1',
+            position: 0,
+            youtube_video_id: 'aaaaaaaaaaa',
+            title: 'Lesson 1A',
+          }),
+          makeVideo({
+            id: 'video-1b',
+            stage_id: 'stage-1',
+            position: 1,
+            youtube_video_id: 'bbbbbbbbbbb',
+            title: 'Lesson 1B',
+          }),
+        ],
+      }),
+      makeStage({
+        id: 'stage-2',
+        position: 1,
+        title: 'Practice',
+        learning_objective: 'Apply the skill',
+        videos: [
+          makeVideo({
+            id: 'video-2a',
+            stage_id: 'stage-2',
+            position: 0,
+            youtube_video_id: 'ccccccccccc',
+            title: 'Lesson 2A',
+          }),
+        ],
+      }),
+    ];
+  }
+
+  it('keeps stage and lesson order identical across stages, ordered items, and layouts', () => {
+    const stages = twoStageFixture();
+    const presentation = buildPathPresentation({
+      pathId: PATH_ID,
+      pathTitle: 'Order path',
+      goal: 'Goal',
+      stages,
+    });
+
+    assert.deepEqual(
+      presentation.stages.map((stage) => stage.stageId),
+      ['stage-1', 'stage-2']
+    );
+    assert.deepEqual(
+      presentation.stages.flatMap((stage) =>
+        stage.lessons.map((lesson) => lesson.pathVideoId)
+      ),
+      ['video-1a', 'video-1b', 'video-2a']
+    );
+
+    const orderedStageAndVideoIds = presentation.orderedItems
+      .filter((item) => item.kind !== 'goal')
+      .map((item) =>
+        item.kind === 'stage' ? item.stageId : item.pathVideoId
+      );
+    assert.deepEqual(orderedStageAndVideoIds, [
+      'stage-1',
+      'video-1a',
+      'video-1b',
+      'stage-2',
+      'video-2a',
+    ]);
+
+    assert.deepEqual(
+      presentation.desktop.nodes
+        .filter((node) => node.kind !== 'goal')
+        .map((node) =>
+          node.kind === 'stage' ? node.stageId : node.pathVideoId
+        ),
+      orderedStageAndVideoIds
+    );
+    assert.deepEqual(
+      presentation.mobile.nodes
+        .filter((node) => node.kind !== 'goal')
+        .map((node) =>
+          node.kind === 'stage' ? node.stageId : node.pathVideoId
+        ),
+      orderedStageAndVideoIds
+    );
+  });
+
+  it('reports truthful per-stage practiced counts and explicit recommended next', () => {
+    const stages = twoStageFixture();
+    const presentation = buildPathPresentation({
+      pathId: PATH_ID,
+      pathTitle: 'Counts path',
+      goal: 'Goal',
+      stages,
+      practicedVideoIds: ['video-1a'],
+    });
+
+    assert.equal(presentation.stages[0].practicedCount, 1);
+    assert.equal(presentation.stages[0].lessonCount, 2);
+    assert.equal(presentation.stages[1].practicedCount, 0);
+    assert.equal(presentation.stages[1].lessonCount, 1);
+
+    assert.ok(presentation.recommendedNext);
+    assert.equal(presentation.recommendedNext.pathVideoId, 'video-1b');
+    assert.equal(presentation.recommendedNext.stageId, 'stage-1');
+    assert.equal(presentation.currentStageId, 'stage-1');
+    assert.equal(presentation.stages[0].isCurrent, true);
+    assert.equal(presentation.stages[1].isCurrent, false);
+
+    const recommendedLesson = presentation.stages[0].lessons.find(
+      (lesson) => lesson.pathVideoId === 'video-1b'
+    );
+    assert.ok(recommendedLesson);
+    assert.equal(recommendedLesson.recommended, true);
+    assert.equal(presentation.stages[0].lessons[0].recommended, false);
+
+    const desktopRecommended = presentation.desktop.nodes.find(
+      (node) => node.kind === 'video' && node.pathVideoId === 'video-1b'
+    );
+    assert.ok(desktopRecommended && desktopRecommended.kind === 'video');
+    assert.equal(desktopRecommended.recommended, true);
+
+    assert.equal(presentation.stages[0].primaryAction?.kind, 'continue');
+    assert.equal(presentation.stages[0].primaryAction?.pathVideoId, 'video-1b');
+    assert.equal(presentation.stages[1].primaryAction?.kind, 'start');
+    assert.equal(presentation.stages[1].primaryAction?.pathVideoId, 'video-2a');
+  });
+
+  it('marks completed and current semantics without locking future stages', () => {
+    const stages = twoStageFixture();
+    const presentation = buildPathPresentation({
+      pathId: PATH_ID,
+      pathTitle: 'Semantics path',
+      goal: 'Goal',
+      stages,
+      practicedVideoIds: ['video-1a', 'video-1b'],
+      completedStageIds: ['stage-1'],
+      selectedStageId: 'stage-2',
+    });
+
+    assert.equal(presentation.stages[0].completed, true);
+    assert.equal(presentation.stages[0].isCurrent, false);
+    assert.equal(presentation.stages[1].completed, false);
+    assert.equal(presentation.stages[1].isCurrent, true);
+    assert.equal(presentation.stages[1].selected, true);
+    assert.equal(presentation.recommendedNext?.pathVideoId, 'video-2a');
+
+    const stageOrdered = presentation.orderedItems.filter(
+      (item) => item.kind === 'stage'
+    );
+    assert.equal(stageOrdered[0].kind, 'stage');
+    assert.equal(stageOrdered[0].completed, true);
+    assert.equal(stageOrdered[0].isCurrent, false);
+    assert.equal(stageOrdered[1].kind, 'stage');
+    assert.equal(stageOrdered[1].isCurrent, true);
+    assert.equal(stageOrdered[1].selected, true);
+
+    const allPracticed = buildPathPresentation({
+      pathId: PATH_ID,
+      pathTitle: 'Done path',
+      goal: 'Goal',
+      stages,
+      practicedVideoIds: ['video-1a', 'video-1b', 'video-2a'],
+      completedStageIds: ['stage-1', 'stage-2'],
+    });
+    assert.equal(allPracticed.recommendedNext, null);
+    assert.equal(allPracticed.currentStageId, null);
+    assert.ok(allPracticed.stages.every((stage) => stage.primaryAction));
+  });
+
+  it('exposes stable expansion ids aligned with stage summaries', () => {
+    const stages = twoStageFixture();
+    const presentation = buildPathPresentation({
+      pathId: PATH_ID,
+      pathTitle: 'Ids path',
+      goal: 'Goal',
+      stages,
+    });
+
+    for (const [index, stage] of presentation.stages.entries()) {
+      assert.equal(stage.nodeId, pathMapStageNodeId(stage.stageId));
+      assert.equal(stage.detailsId, pathMapStageDetailsId(stage.stageId));
+      assert.equal(stage.objective, stages[index].learning_objective);
+    }
+
+    const stageItems = presentation.orderedItems.filter(
+      (item) => item.kind === 'stage'
+    );
+    assert.deepEqual(
+      stageItems.map((item) =>
+        item.kind === 'stage' ? item.detailsId : null
+      ),
+      presentation.stages.map((stage) => stage.detailsId)
+    );
+
+    const stageNodes = presentation.desktop.nodes.filter(
+      (node) => node.kind === 'stage'
+    );
+    assert.deepEqual(
+      stageNodes.map((node) =>
+        node.kind === 'stage' ? node.detailsId : null
+      ),
+      presentation.stages.map((stage) => stage.detailsId)
+    );
+
+    const recommended = resolveRecommendedNextLesson(
+      sortStagesForPresentation(stages),
+      new Set(),
+      PATH_ID,
+      (youtubeVideoId, pathId, pathVideoId) =>
+        `/watch/${youtubeVideoId}?pathId=${pathId}&pathVideoId=${pathVideoId}`
+    );
+    assert.equal(recommended?.pathVideoId, 'video-1a');
+    assert.equal(recommended?.nodeId, pathMapVideoNodeId('video-1a'));
+  });
+
+  it('preserves custom buildVideoHref on recommended next and primary actions', () => {
+    const stages = twoStageFixture();
+    const presentation = buildPathPresentation({
+      pathId: PATH_ID,
+      pathTitle: 'Href path',
+      goal: 'Goal',
+      stages,
+      practicedVideoIds: ['video-1a'],
+      buildVideoHref: (_youtubeVideoId, _pathId, pathVideoId) =>
+        `/#demo-${pathVideoId}`,
+    });
+
+    assert.equal(presentation.recommendedNext?.href, '/#demo-video-1b');
+    assert.equal(presentation.stages[0].primaryAction?.href, '/#demo-video-1b');
+    assert.equal(presentation.stages[0].lessons[1].href, '/#demo-video-1b');
+    const mapVideo = presentation.desktop.nodes.find(
+      (node) => node.kind === 'video' && node.pathVideoId === 'video-1b'
+    );
+    assert.ok(mapVideo && mapVideo.kind === 'video');
+    assert.equal(mapVideo.href, '/#demo-video-1b');
+  });
+
+  it('resolves expansion for return, collapse, revisit, and path changes', () => {
+    const available = ['stage-1', 'stage-2'];
+
+    assert.equal(
+      resolvePathMapExpandedStageId({
+        availableStageIds: available,
+        selectedStageId: 'stage-2',
+        currentStageId: 'stage-1',
+      }),
+      'stage-2'
+    );
+    assert.equal(
+      resolvePathMapExpandedStageId({
+        availableStageIds: available,
+        currentStageId: 'stage-1',
+      }),
+      'stage-1'
+    );
+    assert.equal(
+      resolvePathMapExpandedStageId({
+        availableStageIds: available,
+        previousExpandedStageId: null,
+        currentStageId: 'stage-1',
+      }),
+      null
+    );
+    assert.equal(
+      resolvePathMapExpandedStageId({
+        availableStageIds: available,
+        previousExpandedStageId: 'stage-2',
+        currentStageId: 'stage-1',
+      }),
+      'stage-2'
+    );
+    assert.equal(
+      resolvePathMapExpandedStageId({
+        availableStageIds: available,
+        previousExpandedStageId: 'stage-2',
+        selectedStageId: 'stage-1',
+        selectionChanged: true,
+      }),
+      'stage-1'
+    );
+    assert.equal(
+      resolvePathMapExpandedStageId({
+        availableStageIds: ['stage-2'],
+        previousExpandedStageId: 'stage-1',
+        currentStageId: 'stage-2',
+        pathChanged: true,
+      }),
+      'stage-2'
+    );
+    assert.equal(
+      resolvePathMapExpandedStageId({
+        availableStageIds: ['stage-2'],
+        previousExpandedStageId: 'stage-gone',
+        currentStageId: 'stage-2',
+      }),
+      'stage-2'
+    );
+    assert.equal(
+      resolvePathMapExpandedStageId({
+        availableStageIds: [],
+        previousExpandedStageId: 'stage-1',
+      }),
+      null
+    );
+
+    assert.equal(
+      pathMapLayoutDomId('desktop', pathMapStageNodeId('stage-1')),
+      'desktop-path-map-stage-stage-1'
+    );
+    assert.equal(
+      pathMapLayoutDomId('mobile', pathMapStageNodeId('stage-1')),
+      'mobile-path-map-stage-stage-1'
+    );
+    assert.notEqual(
+      pathMapLayoutDomId('desktop', pathMapStageNodeId('stage-1')),
+      pathMapLayoutDomId('mobile', pathMapStageNodeId('stage-1'))
+    );
+  });
+
+  it('keeps recommended next aligned with explicit practiced ids only', () => {
+    const stages = twoStageFixture();
+    const fromPractice = buildPathPresentation({
+      pathId: PATH_ID,
+      pathTitle: 'Practice only',
+      goal: 'Goal',
+      stages,
+      practicedVideoIds: ['video-1a'],
+      selectedPathVideoId: 'video-2a',
+      selectedStageId: 'stage-2',
+    });
+
+    assert.equal(fromPractice.recommendedNext?.pathVideoId, 'video-1b');
+    assert.equal(fromPractice.currentStageId, 'stage-1');
+    assert.equal(fromPractice.stages[0].isCurrent, true);
+    assert.equal(fromPractice.stages[1].selected, true);
+    assert.equal(
+      fromPractice.stages[0].lessons.some((lesson) => lesson.recommended),
+      true
+    );
+    assert.equal(
+      fromPractice.stages[1].lessons.some((lesson) => lesson.recommended),
+      false
+    );
   });
 });

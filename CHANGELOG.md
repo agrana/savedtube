@@ -2,6 +2,17 @@
 
 This file records user-visible product changes and meaningful engineering changes. Each completed feature slice gets an entry when it is delivered. Deferred ideas and unfinished work belong in [`backlog.md`](backlog.md).
 
+## 2026-10-16
+
+### Added
+
+- Added the first guided path-map experience: a responsive left-to-right desktop and top-to-bottom portrait-mobile flow with continuous connectors, stage numbers, current/completed states, explicit recommended-next guidance, truthful practiced counts, and Start/Continue actions.
+- Made stages accessible interactive controls with one expanded stage at a time, objective and lesson details, keyboard focus states, stable return context, reduced-motion-safe transitions, and preserved exploration of future and completed stages.
+
+### Fixed
+
+- Preserved public demo lesson selection in URL history, including browser Back restoration to the initial lesson without resetting existing non-demo anchors.
+
 ## 2026-10-11
 
 ### Fixed

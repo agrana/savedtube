@@ -14,7 +14,7 @@ import {
   findDemoVideo,
   getPlayableDemoVideos,
   markDemoVideoUnavailable,
-  parseDemoLandingVideoHash,
+  resolveDemoLandingVideoFromHash,
   resolveInitialDemoVideo,
   type DemoPathFixture,
   type DemoPathVideo,
@@ -103,12 +103,11 @@ export default function DemoPathLanding() {
 
   useEffect(() => {
     const applyHash = () => {
-      const fromHash = parseDemoLandingVideoHash(window.location.hash);
-      if (!fromHash) {
-        return;
-      }
       setSelectedVideo((current) => {
-        const next = resolveInitialDemoVideo(fixture, fromHash);
+        const next = resolveDemoLandingVideoFromHash(
+          fixture,
+          window.location.hash
+        );
         return next ?? current;
       });
       setPlayerError(null);
@@ -138,8 +137,9 @@ export default function DemoPathLanding() {
     const href = buildDemoLandingHref(video.id);
     if (typeof window !== 'undefined') {
       const desiredHash = href.startsWith('/') ? href.slice(1) : href;
+      // Hash history keeps browser Back compatible with existing #demo-video-* links.
       if (window.location.hash !== desiredHash) {
-        window.history.replaceState(null, '', href);
+        window.location.hash = desiredHash;
       }
     }
   };
