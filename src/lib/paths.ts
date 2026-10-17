@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   normalizePathLearningPreferences,
   pathLearningPreferencesInputSchema,
+  resolvePathLearningInput,
   serializePathLearningPreferences,
   type PathLearningPreferences,
 } from './path-learning-preferences';
@@ -59,15 +60,21 @@ export const updatePathSchema = z
       )
       .nullable()
       .optional(),
+    /** Structured learning levers; validated server-side when present. */
+    preferences: pathLearningPreferencesInputSchema.optional(),
     title: trimmedNonEmpty(PATH_TITLE_MAX_LENGTH, 'Title').optional(),
   })
   .refine(
     (value) =>
       value.goal !== undefined ||
       value.background !== undefined ||
+      value.preferences !== undefined ||
       value.title !== undefined,
     { message: 'At least one field is required' }
   );
+
+/** Query param for regenerate-from-owned-path form prefills (path id only). */
+export const PATH_REGENERATE_FROM_QUERY_PARAM = 'fromPath';
 
 export const pathListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -90,11 +97,38 @@ export type CreatePathInput = {
   /** Cleaned learner-facing path title; defaults from title/goal. */
   display_path?: string | null;
 };
-export type UpdatePathInput = z.infer<typeof updatePathSchema>;
+export type UpdatePathInput = {
+  goal?: string;
+  background?: string | null;
+  /** When set, persisted as structured JSON in background (no migration). */
+  preferences?: PathLearningPreferences | null;
+  title?: string;
+};
 export type PathListQuery = {
   page: number;
   limit: number;
 };
+
+export function buildPathRegenerateHref(pathId: string): string {
+  return `/paths/new?${PATH_REGENERATE_FROM_QUERY_PARAM}=${encodeURIComponent(pathId)}`;
+}
+
+/**
+ * Parse regenerate `fromPath` query values.
+ * Missing means fresh create; invalid UUIDs fail closed without fetching.
+ */
+export function parsePathRegenerateFromQuery(
+  value: string | null | undefined
+): { ok: true; pathId: string } | { ok: false; reason: 'missing' | 'invalid' } {
+  if (value == null || value.trim().length === 0) {
+    return { ok: false, reason: 'missing' };
+  }
+  const parsed = pathIdSchema.safeParse(value.trim());
+  if (!parsed.success) {
+    return { ok: false, reason: 'invalid' };
+  }
+  return { ok: true, pathId: parsed.data };
+}
 
 export type PathRecord = {
   id: string;
@@ -202,7 +236,36 @@ export function parseCreatePathBody(body: unknown) {
 }
 
 export function parseUpdatePathBody(body: unknown) {
-  return parseWithSchema(updatePathSchema, body);
+  const parsed = parseWithSchema(updatePathSchema, body);
+  if (!parsed.success) {
+    return parsed;
+  }
+
+  const hasPreferencesKey =
+    body !== null &&
+    typeof body === 'object' &&
+    Object.prototype.hasOwnProperty.call(body, 'preferences');
+
+  const preferences = hasPreferencesKey
+    ? normalizePathLearningPreferences(parsed.data.preferences ?? {})
+    : null;
+
+  return {
+    success: true as const,
+    data: {
+      goal: parsed.data.goal,
+      // Preferences clear request background; updateOwnedPath may preserve owned legacy.
+      background: preferences
+        ? null
+        : parsed.data.background === undefined
+          ? undefined
+          : parsed.data.background && parsed.data.background.length > 0
+            ? parsed.data.background
+            : null,
+      preferences,
+      title: parsed.data.title,
+    } satisfies UpdatePathInput,
+  };
 }
 
 export function parsePathId(pathId: unknown) {
@@ -384,7 +447,13 @@ export async function updateOwnedPath(
       patch.display_objective = input.goal;
     }
   }
-  if (input.background !== undefined) {
+  if (input.preferences) {
+    // Preserve legacy free-text from the owned row only — never from the request.
+    const existingLearning = resolvePathLearningInput(existing.path.background);
+    patch.background = serializePathLearningPreferences(input.preferences, {
+      legacyBackground: existingLearning.legacyBackground,
+    });
+  } else if (input.background !== undefined) {
     patch.background =
       input.background && input.background.length > 0 ? input.background : null;
   }

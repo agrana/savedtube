@@ -121,6 +121,32 @@ describe('path learning preference serialization and persistence', () => {
     assert.deepEqual(legacy.preferences, DEFAULT_PATH_LEARNING_PREFERENCES);
   });
 
+  it('preserves optional legacyBackground in envelopes and accepts previous envelopes', () => {
+    const prefs = {
+      level: 'intermediate' as const,
+      maxVideoDurationMinutes: 20 as const,
+      style: 'fun' as const,
+    };
+    const withLegacy = serializePathLearningPreferences(prefs, {
+      legacyBackground: '  I know Linux  ',
+    });
+    const resolved = resolvePathLearningInput(withLegacy);
+    assert.equal(resolved.storedAsPreferences, true);
+    assert.equal(resolved.legacyBackground, 'I know Linux');
+    assert.deepEqual(resolved.preferences, prefs);
+
+    const previousEnvelope = JSON.stringify({
+      savedtubeLearningPreferences: 1,
+      level: 'beginner',
+      maxVideoDurationMinutes: null,
+      style: 'corporate',
+    });
+    const previous = resolvePathLearningInput(previousEnvelope);
+    assert.equal(previous.storedAsPreferences, true);
+    assert.equal(previous.legacyBackground, null);
+    assert.deepEqual(previous.preferences, DEFAULT_PATH_LEARNING_PREFERENCES);
+  });
+
   it('persists preferences on create and leaves old free-text background paths intact', async () => {
     const rows: Array<Record<string, unknown>> = [];
     const client = {

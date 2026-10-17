@@ -78,6 +78,9 @@ export const pathLearningPreferencesInputSchema = z
   })
   .strict();
 
+/** Matches paths.background free-text max; kept local to avoid import cycles. */
+const PATH_LEGACY_BACKGROUND_MAX_LENGTH = 2000;
+
 const preferencesStorageEnvelopeSchema = z
   .object({
     [PATH_LEARNING_PREFERENCES_STORAGE_KEY]: z.literal(
@@ -94,6 +97,13 @@ const preferencesStorageEnvelopeSchema = z
       z.literal(60),
     ]),
     style: z.enum(PATH_LEARNING_STYLES),
+    /** Optional preserved free-text from pre-preferences paths. */
+    legacyBackground: z
+      .string()
+      .trim()
+      .min(1)
+      .max(PATH_LEGACY_BACKGROUND_MAX_LENGTH)
+      .optional(),
   })
   .strict();
 
@@ -130,14 +140,22 @@ export function parsePathLearningPreferences(
 }
 
 export function serializePathLearningPreferences(
-  preferences: PathLearningPreferences
+  preferences: PathLearningPreferences,
+  options?: { legacyBackground?: string | null }
 ): string {
+  const legacy =
+    typeof options?.legacyBackground === 'string'
+      ? options.legacyBackground
+          .trim()
+          .slice(0, PATH_LEGACY_BACKGROUND_MAX_LENGTH)
+      : '';
   return JSON.stringify({
     [PATH_LEARNING_PREFERENCES_STORAGE_KEY]:
       PATH_LEARNING_PREFERENCES_STORAGE_VERSION,
     level: preferences.level,
     maxVideoDurationMinutes: preferences.maxVideoDurationMinutes,
     style: preferences.style,
+    ...(legacy.length > 0 ? { legacyBackground: legacy } : {}),
   });
 }
 
@@ -170,7 +188,7 @@ export function resolvePathLearningInput(background: string | null): {
             maxVideoDurationMinutes: envelope.data.maxVideoDurationMinutes,
             style: envelope.data.style,
           },
-          legacyBackground: null,
+          legacyBackground: envelope.data.legacyBackground ?? null,
           storedAsPreferences: true,
         };
       }
@@ -183,6 +201,28 @@ export function resolvePathLearningInput(background: string | null): {
     preferences: { ...DEFAULT_PATH_LEARNING_PREFERENCES },
     legacyBackground: trimmed,
     storedAsPreferences: false,
+  };
+}
+
+/**
+ * Prefill the create/regenerate form from an owned path row.
+ * Always uses the stored raw goal (not cleaned display_objective).
+ */
+export function pathCreateFormPrefillFromStoredPath(path: {
+  goal: string;
+  background: string | null;
+}): {
+  goal: string;
+  preferences: PathLearningPreferences;
+  legacyBackground: string | null;
+  storedAsPreferences: boolean;
+} {
+  const resolved = resolvePathLearningInput(path.background);
+  return {
+    goal: path.goal,
+    preferences: resolved.preferences,
+    legacyBackground: resolved.legacyBackground,
+    storedAsPreferences: resolved.storedAsPreferences,
   };
 }
 

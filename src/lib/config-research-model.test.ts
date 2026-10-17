@@ -149,6 +149,10 @@ describe('path create preserves shell when research is misconfigured', () => {
     );
     assert.match(source, /Always open the saved path/);
     assert.match(source, /researchError=/);
-    assert.match(source, /router\.push\(`\/paths\/\$\{pathId\}/);
+    assert.match(source, /buildResearchResultQuery/);
+    assert.match(
+      source,
+      /router\.push\(\s*`\/paths\/\$\{pathId\}\$\{buildResearchResultQuery/
+    );
   });
 });

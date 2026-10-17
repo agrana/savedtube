@@ -21,7 +21,7 @@ import {
   YOUTUBE_REAUTH_REQUIRED_MESSAGE,
 } from '@/lib/api-auth-errors';
 import type { PathVideoDismissalReviewItem } from '@/lib/path-dismissals';
-import type { PathRecord } from '@/lib/paths';
+import { buildPathRegenerateHref, type PathRecord } from '@/lib/paths';
 import type {
   PathJobPublicView,
   PathRevisionRecord,
@@ -720,14 +720,12 @@ export default function PathDetailPage() {
                 )}
                 {pageState.stages.length > 0 && (
                   <>
-                    <button
-                      type="button"
-                      onClick={() => void handleResearch()}
-                      disabled={isResearching}
-                      className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-stone-200 transition hover:bg-white/[0.06] disabled:opacity-60"
+                    <Link
+                      href={buildPathRegenerateHref(pathId)}
+                      className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-stone-200 transition hover:bg-white/[0.06]"
                     >
-                      {isResearching ? 'Regenerating...' : 'Regenerate draft'}
-                    </button>
+                      Regenerate
+                    </Link>
                     <button
                       type="button"
                       aria-expanded={isSequenceEditorOpen}

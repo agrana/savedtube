@@ -594,20 +594,23 @@ describe('path-map accessibility structure', () => {
     assert.match(source, />\s*Edit sequence\s*</);
     assert.match(source, /id="path-sequence-editor"/);
     assert.match(source, /role="region"/);
-    assert.match(
-      source,
-      /aria-labelledby="path-sequence-editor-heading"/
-    );
+    assert.match(source, /aria-labelledby="path-sequence-editor-heading"/);
     assert.match(source, /hidden=\{!isSequenceEditorOpen\}/);
     assert.match(source, /setIsSequenceEditorOpen\(false\)/);
     assert.match(source, />\s*Done\s*</);
 
-    const regenerateIndex = source.indexOf('Regenerate draft');
-    const editDisclosureIndex = source.indexOf('aria-controls="path-sequence-editor"');
+    const regenerateMatch = source.match(/>\s*Regenerate\s*</);
+    const regenerateIndex = regenerateMatch?.index ?? -1;
+    const regenerateDraftIndex = source.indexOf('Regenerate draft');
+    const editDisclosureIndex = source.indexOf(
+      'aria-controls="path-sequence-editor"'
+    );
     const mapIndex = source.indexOf('<PathMap');
     const editorRegionIndex = source.indexOf('id="path-sequence-editor"');
     const emptyPathIndex = source.indexOf('Empty path');
     assert.ok(regenerateIndex > 0);
+    assert.equal(regenerateDraftIndex, -1);
+    assert.match(source, /buildPathRegenerateHref/);
     assert.ok(editDisclosureIndex > regenerateIndex);
     assert.ok(mapIndex > editDisclosureIndex);
     assert.ok(editorRegionIndex > mapIndex);
@@ -705,9 +708,7 @@ describe('path-map stage expansion contract', () => {
 
     const orderedStageAndVideoIds = presentation.orderedItems
       .filter((item) => item.kind !== 'goal')
-      .map((item) =>
-        item.kind === 'stage' ? item.stageId : item.pathVideoId
-      );
+      .map((item) => (item.kind === 'stage' ? item.stageId : item.pathVideoId));
     assert.deepEqual(orderedStageAndVideoIds, [
       'stage-1',
       'video-1a',
@@ -832,9 +833,7 @@ describe('path-map stage expansion contract', () => {
       (item) => item.kind === 'stage'
     );
     assert.deepEqual(
-      stageItems.map((item) =>
-        item.kind === 'stage' ? item.detailsId : null
-      ),
+      stageItems.map((item) => (item.kind === 'stage' ? item.detailsId : null)),
       presentation.stages.map((stage) => stage.detailsId)
     );
 
@@ -842,9 +841,7 @@ describe('path-map stage expansion contract', () => {
       (node) => node.kind === 'stage'
     );
     assert.deepEqual(
-      stageNodes.map((node) =>
-        node.kind === 'stage' ? node.detailsId : null
-      ),
+      stageNodes.map((node) => (node.kind === 'stage' ? node.detailsId : null)),
       presentation.stages.map((stage) => stage.detailsId)
     );
 

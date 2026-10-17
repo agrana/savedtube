@@ -37,6 +37,8 @@ describe('authenticated home and paths dashboard source contract', () => {
     assert.match(createPage, /Create and research/);
     assert.match(createPage, /method: 'POST'/);
     assert.match(createPage, /\/api\/paths/);
+    assert.match(createPage, /PATH_REGENERATE_FROM_QUERY_PARAM/);
+    assert.match(createPage, /Regenerate path/);
 
     assert.match(dashboard, /Create new path/);
     assert.match(dashboard, /href="\/paths\/new"/);

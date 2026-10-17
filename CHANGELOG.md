@@ -4,6 +4,10 @@ This file records user-visible product changes and meaningful engineering change
 
 ## 2026-10-17
 
+### Changed
+
+- Renamed path detail **Regenerate draft** to **Regenerate**. The control now opens the path creation form prefilled from the authenticated owned path id (`fromPath`) with the original stored goal prompt and Level / Max length / Style — no research call on click. Explicit submit updates the same path then researches; fresh-create drafts stay compatible. Invalid, unauthorized, or missing source paths fail closed without an empty create. Research idempotency keys are scoped to a form-visit intent plus the canonical edited goal/preferences (retries reuse; edited settings or a new visit mint a fresh key; terminal success/failure clears). Switching from regenerate to fresh `/paths/new` without a stored draft clears the old goal and preferences. Regenerating a legacy free-text background path preserves that text in an optional `legacyBackground` field on the structured preferences envelope so research still receives it.
+
 ### Fixed
 
 - Restored niche YouTube search recall when Level/Style preferences would otherwise dilute entity queries. Research now searches base topic/entity queries first, optionally tries preference-enriched soft-bias queries, then a bounded broader entity-preserving fallback, while keeping max video length as a hard verified-metadata filter and distinguishing topic misses from duration exclusions and upstream API failures.
@@ -18,7 +22,7 @@ This file records user-visible product changes and meaningful engineering change
 
 ### Changed
 
-- Hid the path sequence editor behind an **Edit sequence** disclosure next to **Regenerate draft**, so the map stays primary while editing remains available on demand with Done to close.
+- Hid the path sequence editor behind an **Edit sequence** disclosure next to **Regenerate**, so the map stays primary while editing remains available on demand with Done to close.
 
 ## 2026-10-16
 

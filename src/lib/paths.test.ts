@@ -4,6 +4,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  DEFAULT_PATH_LEARNING_PREFERENCES,
+  serializePathLearningPreferences,
+} from './path-learning-preferences.ts';
+import {
   PATH_GOAL_MAX_LENGTH,
   PATH_LIST_DEFAULT_LIMIT,
   createOwnedPath,
@@ -336,6 +340,12 @@ describe('path validation', () => {
   it('requires at least one field on update', () => {
     assert.equal(parseUpdatePathBody({}).success, false);
     assert.equal(parseUpdatePathBody({ title: 'New title' }).success, true);
+    assert.equal(
+      parseUpdatePathBody({
+        preferences: { level: 'advanced' },
+      }).success,
+      true
+    );
   });
 
   it('validates path ids and list pagination', () => {
@@ -441,6 +451,62 @@ describe('path CRUD service (in-memory)', () => {
     assert.equal(afterDelete.ok, false);
     if (!afterDelete.ok) {
       assert.equal(afterDelete.status, 404);
+    }
+  });
+
+  it('updates owned path goal and preferences in place for regenerate', async () => {
+    const client = createMemoryPathsClient([
+      makePath({
+        id: '55555555-5555-4555-8555-555555555555',
+        owner: 'user-a',
+        goal: 'Original goal',
+        background: 'I know Linux',
+      }),
+    ]) as never;
+
+    const updated = await updateOwnedPath(
+      client,
+      'user-a',
+      '55555555-5555-4555-8555-555555555555',
+      {
+        goal: 'Edited goal',
+        preferences: {
+          level: 'advanced',
+          maxVideoDurationMinutes: 10,
+          style: 'academic',
+        },
+      }
+    );
+    assert.equal(updated.ok, true);
+    if (!updated.ok) {
+      return;
+    }
+    assert.equal(updated.path.id, '55555555-5555-4555-8555-555555555555');
+    assert.equal(updated.path.goal, 'Edited goal');
+    assert.equal(
+      updated.path.background,
+      serializePathLearningPreferences(
+        {
+          level: 'advanced',
+          maxVideoDurationMinutes: 10,
+          style: 'academic',
+        },
+        { legacyBackground: 'I know Linux' }
+      )
+    );
+
+    const foreign = await updateOwnedPath(
+      client,
+      'user-b',
+      '55555555-5555-4555-8555-555555555555',
+      {
+        goal: 'Hijacked',
+        preferences: { ...DEFAULT_PATH_LEARNING_PREFERENCES },
+      }
+    );
+    assert.equal(foreign.ok, false);
+    if (!foreign.ok) {
+      assert.equal(foreign.status, 404);
     }
   });
 
