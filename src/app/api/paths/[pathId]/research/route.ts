@@ -8,6 +8,7 @@ import {
   runPathResearch,
 } from '@/lib/path-research';
 import { parseResearchRequestBody } from '@/lib/path-research-schema';
+import { withEffectiveUserDailyBudget } from '@/lib/research-user-budget';
 import { createServerSupabaseClient } from '@/lib/supabase';
 
 /**
@@ -80,6 +81,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
         { status: 503 }
       );
     }
+
+    deps.researchConfig = withEffectiveUserDailyBudget(
+      deps.researchConfig,
+      auth.session.user.email
+    );
 
     const result = await runPathResearch({
       deps,

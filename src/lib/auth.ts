@@ -45,6 +45,10 @@ export const authOptions = {
     async session({ session, token }: any) {
       session.accessToken = token.accessToken;
       session.user.id = token.sub!;
+      // Trusted account email comes from the JWT (Google profile), not request body.
+      if (typeof token.email === 'string') {
+        session.user.email = token.email;
+      }
 
       if (token.error) {
         session.error = token.error;

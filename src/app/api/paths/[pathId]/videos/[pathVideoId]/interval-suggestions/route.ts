@@ -10,6 +10,7 @@ import {
 } from '@/lib/interval-suggestions';
 import { createDefaultIntervalSuggestionDeps } from '@/lib/interval-suggestions-runtime';
 import { parsePathId } from '@/lib/paths';
+import { withEffectiveUserDailyBudget } from '@/lib/research-user-budget';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
 
@@ -111,6 +112,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
         { status: 503 }
       );
     }
+
+    deps.researchConfig = withEffectiveUserDailyBudget(
+      deps.researchConfig,
+      auth.session.user.email
+    );
 
     const result = await generateOwnedIntervalSuggestions(
       deps,

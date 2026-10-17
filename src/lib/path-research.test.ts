@@ -987,6 +987,59 @@ describe('idempotency and budgets', () => {
     }
     assert.equal(db.jobs.length, 0);
   });
+
+  it('reserves against the effective userDailyBudget from settings', async () => {
+    const path = makePath({
+      id: '44444444-4444-4444-8444-444444444445',
+      owner: 'user-a',
+      goal: 'Pass the CKA',
+    });
+    const db = createMemoryResearchDb([path]);
+    db.usage.push({
+      scope_type: 'user',
+      scope_key: 'user-a',
+      period_start: '2026-09-26',
+      reserved_units: 10,
+      consumed_units: 10,
+    });
+    db.usage.push({
+      scope_type: 'project',
+      scope_key: 'project',
+      period_start: '2026-09-26',
+      reserved_units: 10,
+      consumed_units: 10,
+    });
+
+    const defaultCap = await claimResearchJob({
+      db: db as never,
+      ownerId: 'user-a',
+      path,
+      idempotencyKey: 'elevated-budget-default',
+      deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+      settings: makeSettings({ userDailyBudget: 10 }),
+      llm: createFakeLlm({}),
+    });
+    assert.equal(defaultCap.ok, false);
+    if (!defaultCap.ok) {
+      assert.equal(defaultCap.status, 429);
+      assert.equal(defaultCap.code, 'user_budget_exhausted');
+    }
+
+    const elevated = await claimResearchJob({
+      db: db as never,
+      ownerId: 'user-a',
+      path,
+      idempotencyKey: 'elevated-budget-override',
+      deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+      settings: makeSettings({ userDailyBudget: 50 }),
+      llm: createFakeLlm({}),
+    });
+    assert.equal(elevated.ok, true);
+    const userUsage = db.usage.find(
+      (row) => row.scope_type === 'user' && row.scope_key === 'user-a'
+    );
+    assert.equal(userUsage?.reserved_units, 11);
+  });
 });
 
 describe('timeout, quota, and provider failure', () => {

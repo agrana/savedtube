@@ -8,6 +8,10 @@ This file records user-visible product changes and meaningful engineering change
 
 - Restored niche YouTube search recall when Level/Style preferences would otherwise dilute entity queries. Research now searches base topic/entity queries first, optionally tries preference-enriched soft-bias queries, then a bounded broader entity-preserving fallback, while keeping max video length as a hard verified-metadata filter and distinguishing topic misses from duration exclusions and upstream API failures.
 
+### Changed
+
+- Raised the daily research/generation budget to 50 units for one explicitly authorized account only, matched server-side by SHA-256 digest of the normalized session email. Default per-user (10) and project (200) caps are unchanged; missing session email fails closed to the default.
+
 ### Added
 
 - Replaced free-text background on path creation with structured learning preferences: Level (Beginner / Intermediate / Advanced), Max length per video (No limit, 5–60 minutes), and Style (Corporate / Fun / Academic). Preferences validate server-side, persist without a schema migration, steer planning/search/selection, and enforce duration caps from verified YouTube metadata. Regeneration reuses stored preferences; legacy free-text background paths keep working.

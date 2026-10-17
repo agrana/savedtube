@@ -27,6 +27,7 @@ declare module 'next-auth/jwt' {
     /** @deprecated Migrated to accessTokenExpires */
     expiresAt?: number;
     error?: string;
+    email?: string | null;
     picture?: string;
   }
 }
