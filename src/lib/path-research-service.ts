@@ -26,9 +26,10 @@ import { filterObviousPromotionalCandidates } from './path-content-policy';
 import type { PathRecord } from './paths';
 import { getOwnedPath, resolveOwnedPathAccess } from './paths';
 import {
-  augmentSearchQueryWithPreferences,
+  buildStageSearchQueryLadder,
   durationCapFailureMessage,
   filterCandidatesByMaxVideoDuration,
+  noTopicMatchFailureMessage,
   preferencesFromResearchSnapshot,
   resolvePathLearningInput,
   type PathLearningPreferences,
@@ -693,6 +694,16 @@ function mergeUsage(
   return { ...base, phases };
 }
 
+function countCandidatesInStages(
+  candidatesByStage: ReadonlyMap<number, ReadonlyArray<ResearchCandidate>>
+): number {
+  let total = 0;
+  for (const candidates of candidatesByStage.values()) {
+    total += candidates.length;
+  }
+  return total;
+}
+
 async function searchCandidatesForPlan(args: {
   youtube: YouTubeClient;
   accessToken: string;
@@ -706,11 +717,15 @@ async function searchCandidatesForPlan(args: {
       ok: true;
       candidatesByStage: Map<number, ResearchCandidate[]>;
       emptyStages: number[];
+      searchCalls: number;
     }
   | { ok: false; code: string; message: string }
 > {
   const candidatesByStage = new Map<number, ResearchCandidate[]>();
   const emptyStages: number[] = [];
+  const maxQueriesPerStage = 3;
+  const maxSearchCalls = args.plan.stages.length * maxQueriesPerStage;
+  let searchCalls = 0;
 
   for (let stageIndex = 0; stageIndex < args.plan.stages.length; stageIndex++) {
     if (args.signal.aborted) {
@@ -722,42 +737,76 @@ async function searchCandidatesForPlan(args: {
     }
 
     const stage = args.plan.stages[stageIndex];
-    const search = await args.youtube.searchEmbeddableVideos({
-      accessToken: args.accessToken,
-      query: augmentSearchQueryWithPreferences(
-        stage.searchQuery,
-        args.preferences
-      ),
-      maxResults: args.candidatesPerStage,
-      timeoutMs: args.timeoutMs,
-      signal: args.signal,
-    });
-
-    if (!search.ok) {
-      return { ok: false, code: search.code, message: search.message };
-    }
-
-    const details = await args.youtube.fetchVideoDetails({
-      accessToken: args.accessToken,
-      videoIds: search.videoIds,
-      timeoutMs: args.timeoutMs,
-      signal: args.signal,
-    });
-
-    if (!details.ok) {
-      return { ok: false, code: details.code, message: details.message };
-    }
-
-    const byId = new Map(
-      details.candidates.map((candidate) => [
-        candidate.youtubeVideoId,
-        candidate,
-      ])
+    const queryLadder = buildStageSearchQueryLadder(
+      stage.searchQuery,
+      args.preferences
     );
-    const ordered = search.videoIds
-      .map((id) => byId.get(id))
-      .filter((c): c is ResearchCandidate => Boolean(c))
-      .slice(0, args.candidatesPerStage);
+    const seenIds = new Set<string>();
+    const ordered: ResearchCandidate[] = [];
+
+    for (const query of queryLadder) {
+      if (ordered.length >= args.candidatesPerStage) {
+        break;
+      }
+      if (searchCalls >= maxSearchCalls) {
+        break;
+      }
+      if (args.signal.aborted) {
+        return {
+          ok: false,
+          code: 'deadline_exceeded',
+          message: 'Research timed out',
+        };
+      }
+
+      searchCalls += 1;
+      const search = await args.youtube.searchEmbeddableVideos({
+        accessToken: args.accessToken,
+        query,
+        maxResults: args.candidatesPerStage,
+        timeoutMs: args.timeoutMs,
+        signal: args.signal,
+      });
+
+      if (!search.ok) {
+        return { ok: false, code: search.code, message: search.message };
+      }
+
+      const novelIds = search.videoIds.filter((id) => !seenIds.has(id));
+      for (const id of search.videoIds) {
+        seenIds.add(id);
+      }
+      if (novelIds.length === 0) {
+        continue;
+      }
+
+      const details = await args.youtube.fetchVideoDetails({
+        accessToken: args.accessToken,
+        videoIds: novelIds,
+        timeoutMs: args.timeoutMs,
+        signal: args.signal,
+      });
+
+      if (!details.ok) {
+        return { ok: false, code: details.code, message: details.message };
+      }
+
+      const byId = new Map(
+        details.candidates.map((candidate) => [
+          candidate.youtubeVideoId,
+          candidate,
+        ])
+      );
+      for (const id of novelIds) {
+        if (ordered.length >= args.candidatesPerStage) {
+          break;
+        }
+        const candidate = byId.get(id);
+        if (candidate) {
+          ordered.push(candidate);
+        }
+      }
+    }
 
     candidatesByStage.set(stageIndex, ordered);
     if (ordered.length === 0) {
@@ -765,7 +814,7 @@ async function searchCandidatesForPlan(args: {
     }
   }
 
-  return { ok: true, candidatesByStage, emptyStages };
+  return { ok: true, candidatesByStage, emptyStages, searchCalls };
 }
 
 export function buildPersistedRevision(args: {
@@ -1049,12 +1098,11 @@ export async function executeResearchPipeline(args: {
     return fail(searchResult.code, searchResult.message, status);
   }
 
-  if (searchResult.emptyStages.length === plan.stages.length) {
-    return fail(
-      'no_candidates',
-      'No playable YouTube videos matched this path. Try refining the goal or learning preferences.',
-      'failed'
-    );
+  if (
+    searchResult.emptyStages.length === plan.stages.length ||
+    countCandidatesInStages(searchResult.candidatesByStage) === 0
+  ) {
+    return fail('no_candidates', noTopicMatchFailureMessage(), 'failed');
   }
 
   const marketingFiltered = filterObviousPromotionalCandidates(
@@ -1063,19 +1111,30 @@ export async function executeResearchPipeline(args: {
   const marketingEmptyStages = [...marketingFiltered.candidatesByStage]
     .filter(([, candidates]) => candidates.length === 0)
     .map(([stageIndex]) => stageIndex);
+  const candidatesBeforeDuration = countCandidatesInStages(
+    marketingFiltered.candidatesByStage
+  );
   const durationFiltered = filterCandidatesByMaxVideoDuration(
     marketingFiltered.candidatesByStage,
     preferences
   );
-  if (
+  const emptiedByDurationCap =
     preferences.maxVideoDurationMinutes !== null &&
-    durationFiltered.emptyStages.length === plan.stages.length
-  ) {
+    candidatesBeforeDuration > 0 &&
+    durationFiltered.rejectedCount > 0 &&
+    durationFiltered.emptyStages.length === plan.stages.length;
+  if (emptiedByDurationCap) {
     return fail(
       'no_candidates',
       durationCapFailureMessage(preferences),
       'failed'
     );
+  }
+  if (
+    durationFiltered.emptyStages.length === plan.stages.length ||
+    countCandidatesInStages(durationFiltered.candidatesByStage) === 0
+  ) {
+    return fail('no_candidates', noTopicMatchFailureMessage(), 'failed');
   }
 
   const filtered = filterResearchCandidatesByPathVideoRules({
@@ -1113,9 +1172,7 @@ export async function executeResearchPipeline(args: {
   if (emptyStagesAfterRules.length === plan.stages.length) {
     return fail(
       'no_candidates',
-      preferences.maxVideoDurationMinutes !== null
-        ? durationCapFailureMessage(preferences)
-        : 'No playable YouTube videos matched this path after applying active path video rules. Try refining the goal or learning preferences.',
+      'No playable YouTube videos matched this path after applying active path video rules. Try refining the goal or learning preferences.',
       'failed'
     );
   }

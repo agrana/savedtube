@@ -213,11 +213,8 @@ function createFakeYouTube(handlers?: {
     searchEmbeddableVideos:
       handlers?.search ||
       (async ({ query }) => {
-        const exact = catalog.get(query);
-        const prefixMatch = [...catalog.entries()].find(([key]) =>
-          query.startsWith(key)
-        )?.[1];
-        const found = exact || prefixMatch || [];
+        // Exact query match only — prefix matching hid preference-keyword dilution.
+        const found = catalog.get(query) || [];
         return { ok: true, videoIds: found.map((item) => item.youtubeVideoId) };
       }),
     fetchVideoDetails:
@@ -1477,12 +1474,10 @@ describe('learning preferences in research pipeline', () => {
                 [candidate('ccccccccccc'), candidate('ddddddddddd')],
               ],
             ]);
-            const prefixMatch = [...catalog.entries()].find(([key]) =>
-              query.startsWith(key)
-            )?.[1];
+            const found = catalog.get(query) || [];
             return {
               ok: true,
-              videoIds: (prefixMatch || []).map((item) => item.youtubeVideoId),
+              videoIds: found.map((item) => item.youtubeVideoId),
             };
           },
           details: async ({ videoIds }) => {
@@ -1492,7 +1487,9 @@ describe('learning preferences in research pipeline', () => {
               candidate('ccccccccccc'),
               candidate('ddddddddddd'),
             ];
-            const byId = new Map(all.map((item) => [item.youtubeVideoId, item]));
+            const byId = new Map(
+              all.map((item) => [item.youtubeVideoId, item])
+            );
             return {
               ok: true,
               candidates: videoIds
@@ -1513,11 +1510,21 @@ describe('learning preferences in research pipeline', () => {
     assert.equal(db.jobs[0]?.input_snapshot.background, null);
     assert.deepEqual(planPreferences[0], preferences);
     assert.deepEqual(selectPreferences[0], preferences);
+    assert.ok(searchQueries.includes('kubernetes basics'));
+    assert.ok(searchQueries.includes('kubernetes practice'));
     assert.ok(
       searchQueries.some(
-        (query) =>
-          query.includes('intermediate') && query.includes('academic')
-      )
+        (query) => query.includes('intermediate') && query.includes('academic')
+      ),
+      'preference-enriched soft-bias queries remain available after the base query'
+    );
+    assert.ok(
+      searchQueries.indexOf('kubernetes basics') <
+        searchQueries.findIndex(
+          (query) =>
+            query.includes('kubernetes basics') &&
+            query.includes('intermediate')
+        )
     );
 
     const second = await runPathResearch({
@@ -1568,10 +1575,7 @@ describe('learning preferences in research pipeline', () => {
 
     assert.equal(result.ok, true);
     assert.equal(receivedBackground, 'I know Linux');
-    assert.deepEqual(
-      receivedPreferences,
-      DEFAULT_PATH_LEARNING_PREFERENCES
-    );
+    assert.deepEqual(receivedPreferences, DEFAULT_PATH_LEARNING_PREFERENCES);
     assert.equal(db.jobs[0]?.input_snapshot.background, 'I know Linux');
   });
 
@@ -1654,6 +1658,263 @@ describe('learning preferences in research pipeline', () => {
     }
     assert.equal(db.videos.length, 2);
     assert.equal(db.videos[0]?.duration_seconds, null);
+  });
+
+  it('recovers niche entity recall when preference-enriched queries are empty', async () => {
+    const preferences = {
+      level: 'beginner' as const,
+      maxVideoDurationMinutes: null,
+      style: 'corporate' as const,
+    };
+    const path = makePath({
+      id: '14141414-1414-4141-8141-141414141414',
+      owner: 'user-a',
+      goal: 'Learn Jev TypeSafe AI decision model',
+      background: serializePathLearningPreferences(preferences),
+    });
+    const db = createMemoryResearchDb([path]);
+    const searchQueries: string[] = [];
+    const nicheA = candidate('abcdefghijk', 'Jev overview');
+    const nicheB = candidate('lmnopqrstuv', 'Jev workflow');
+
+    const result = await runPathResearch({
+      deps: makeDeps({
+        db,
+        llm: createFakeLlm({
+          planStages: async () => ({
+            ok: true,
+            data: {
+              stages: [
+                {
+                  title: 'Jev foundations',
+                  learningObjective: 'Understand Jev',
+                  reason: 'Start with the product',
+                  searchQuery: 'Jev TypeSafe AI decision model',
+                },
+              ],
+            },
+            latencyMs: 1,
+          }),
+        }),
+        youtube: createFakeYouTube({
+          search: async ({ query }) => {
+            searchQueries.push(query);
+            if (
+              /beginner|professional|corporate|fun|engaging|academic|lecture/i.test(
+                query
+              )
+            ) {
+              return { ok: true, videoIds: [] };
+            }
+            if (query === 'Jev TypeSafe AI decision model') {
+              return {
+                ok: true,
+                videoIds: [nicheA.youtubeVideoId, nicheB.youtubeVideoId],
+              };
+            }
+            return { ok: true, videoIds: [] };
+          },
+          details: async ({ videoIds }) => {
+            const byId = new Map(
+              [nicheA, nicheB].map((item) => [item.youtubeVideoId, item])
+            );
+            return {
+              ok: true,
+              candidates: videoIds
+                .map((id) => byId.get(id))
+                .filter((item): item is ResearchCandidate => Boolean(item)),
+            };
+          },
+        }),
+      }),
+      ownerId: 'user-a',
+      pathId: path.id,
+      idempotencyKey: 'niche-recall-aaaaaa',
+      accessToken: 'token',
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(searchQueries[0], 'Jev TypeSafe AI decision model');
+    assert.ok(
+      searchQueries.some((query) =>
+        /beginner.*professional corporate|professional corporate/.test(query)
+      )
+    );
+    assert.equal(db.videos.length, 1);
+    assert.ok(
+      [nicheA.youtubeVideoId, nicheB.youtubeVideoId].includes(
+        String(db.videos[0]?.youtube_video_id)
+      )
+    );
+  });
+
+  it('falls back to a broader entity query when base and enriched searches are empty', async () => {
+    const preferences = {
+      level: 'beginner' as const,
+      maxVideoDurationMinutes: null,
+      style: 'corporate' as const,
+    };
+    const path = makePath({
+      id: '15151515-1515-4151-8151-151515151515',
+      owner: 'user-a',
+      goal: 'Learn Jev TypeSafe AI',
+      background: serializePathLearningPreferences(preferences),
+    });
+    const db = createMemoryResearchDb([path]);
+    const searchQueries: string[] = [];
+    const broaderHit = candidate('zyxwvutsrqp', 'Jev TypeSafe intro');
+
+    const result = await runPathResearch({
+      deps: makeDeps({
+        db,
+        llm: createFakeLlm({
+          planStages: async () => ({
+            ok: true,
+            data: {
+              stages: [
+                {
+                  title: 'Jev',
+                  learningObjective: 'Meet Jev',
+                  reason: 'Entity first',
+                  searchQuery: 'Jev TypeSafe AI decision model walkthrough',
+                },
+              ],
+            },
+            latencyMs: 1,
+          }),
+        }),
+        youtube: createFakeYouTube({
+          search: async ({ query }) => {
+            searchQueries.push(query);
+            if (query === 'Jev TypeSafe AI decision model') {
+              return { ok: true, videoIds: [broaderHit.youtubeVideoId] };
+            }
+            return { ok: true, videoIds: [] };
+          },
+          details: async ({ videoIds }) => ({
+            ok: true,
+            candidates: videoIds.includes(broaderHit.youtubeVideoId)
+              ? [broaderHit]
+              : [],
+          }),
+        }),
+      }),
+      ownerId: 'user-a',
+      pathId: path.id,
+      idempotencyKey: 'broader-fallback-aaa',
+      accessToken: 'token',
+    });
+
+    assert.equal(result.ok, true);
+    assert.ok(
+      searchQueries.includes('Jev TypeSafe AI decision model walkthrough')
+    );
+    assert.ok(searchQueries.some((query) => query.includes('beginner')));
+    assert.ok(searchQueries.includes('Jev TypeSafe AI decision model'));
+    assert.equal(db.videos[0]?.youtube_video_id, broaderHit.youtubeVideoId);
+  });
+
+  it('reports a topic miss without blaming duration when search returns nothing', async () => {
+    const preferences = {
+      level: 'beginner' as const,
+      maxVideoDurationMinutes: 10 as const,
+      style: 'corporate' as const,
+    };
+    const path = makePath({
+      id: '16161616-1616-4161-8161-161616161616',
+      owner: 'user-a',
+      goal: 'Learn a nonexistent niche topic xyzzyplugh',
+      background: serializePathLearningPreferences(preferences),
+    });
+    const db = createMemoryResearchDb([path]);
+    const searchQueries: string[] = [];
+
+    const result = await runPathResearch({
+      deps: makeDeps({
+        db,
+        youtube: createFakeYouTube({
+          search: async ({ query }) => {
+            searchQueries.push(query);
+            return { ok: true, videoIds: [] };
+          },
+        }),
+      }),
+      ownerId: 'user-a',
+      pathId: path.id,
+      idempotencyKey: 'topic-miss-aaaaaaa',
+      accessToken: 'token',
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(db.jobs[0]?.error?.code, 'no_candidates');
+    assert.match(String(db.jobs[0]?.error?.message || ''), /matched this path/);
+    assert.doesNotMatch(String(db.jobs[0]?.error?.message || ''), /10-minute/);
+    assert.ok(searchQueries.length > 0);
+    assert.ok(searchQueries.length <= 2 * 3);
+  });
+
+  it('keeps search ladder calls within a bounded budget and dedupes video ids', async () => {
+    const preferences = {
+      level: 'beginner' as const,
+      maxVideoDurationMinutes: null,
+      style: 'corporate' as const,
+    };
+    const path = makePath({
+      id: '17171717-1717-4171-8171-171717171717',
+      owner: 'user-a',
+      goal: 'Pass the CKA',
+      background: serializePathLearningPreferences(preferences),
+    });
+    const db = createMemoryResearchDb([path]);
+    const searchQueries: string[] = [];
+    const detailRequests: string[][] = [];
+    const shared = candidate('aaaaaaaaaaa');
+
+    const result = await runPathResearch({
+      deps: makeDeps({
+        db,
+        settings: makeSettings({ candidatesPerStage: 2 }),
+        llm: createFakeLlm({
+          planStages: async () => ({
+            ok: true,
+            data: {
+              stages: [
+                {
+                  title: 'Basics',
+                  learningObjective: 'Learn basics',
+                  reason: 'Start',
+                  searchQuery: 'kubernetes basics tutorial',
+                },
+              ],
+            },
+            latencyMs: 1,
+          }),
+        }),
+        youtube: createFakeYouTube({
+          search: async ({ query }) => {
+            searchQueries.push(query);
+            return { ok: true, videoIds: [shared.youtubeVideoId] };
+          },
+          details: async ({ videoIds }) => {
+            detailRequests.push([...videoIds]);
+            return { ok: true, candidates: [shared] };
+          },
+        }),
+      }),
+      ownerId: 'user-a',
+      pathId: path.id,
+      idempotencyKey: 'dedupe-budget-aaaa',
+      accessToken: 'token',
+    });
+
+    assert.equal(result.ok, true);
+    assert.ok(searchQueries.length >= 1);
+    assert.ok(searchQueries.length <= 3);
+    assert.deepEqual(detailRequests[0], [shared.youtubeVideoId]);
+    assert.ok(
+      detailRequests.every((ids) => ids.length === 1),
+      'deduped ids should not re-fetch the same video across ladder steps'
+    );
   });
 });
 

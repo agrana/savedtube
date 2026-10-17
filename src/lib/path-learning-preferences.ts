@@ -7,11 +7,7 @@ export const PATH_LEARNING_LEVELS = [
   'advanced',
 ] as const;
 
-export const PATH_LEARNING_STYLES = [
-  'corporate',
-  'fun',
-  'academic',
-] as const;
+export const PATH_LEARNING_STYLES = ['corporate', 'fun', 'academic'] as const;
 
 /** Minutes per video. `null` means no per-video duration cap. */
 export const PATH_MAX_VIDEO_DURATION_MINUTES_OPTIONS = [
@@ -235,21 +231,141 @@ const STYLE_SEARCH_HINT: Record<PathLearningStyle, string> = {
   academic: 'academic lecture',
 };
 
+/** Generic filler that dilutes niche entity/product recall when over-applied. */
+const SEARCH_QUERY_BROADER_FILLER = new Set(
+  [
+    ...Object.values(LEVEL_SEARCH_HINT),
+    ...Object.values(STYLE_SEARCH_HINT).flatMap((hint) => hint.split(/\s+/)),
+    'beginner',
+    'intermediate',
+    'advanced',
+    'professional',
+    'corporate',
+    'fun',
+    'engaging',
+    'academic',
+    'lecture',
+    'tutorial',
+    'introduction',
+    'intro',
+    'basics',
+    'overview',
+    'explained',
+    'walkthrough',
+    'guide',
+    'course',
+    'lesson',
+    'learn',
+    'learning',
+    'how',
+    'to',
+    'the',
+    'a',
+    'an',
+    'and',
+    'or',
+    'of',
+    'for',
+    'with',
+    'from',
+    'into',
+    'about',
+    'on',
+    'in',
+    'video',
+    'videos',
+    'youtube',
+    'demo',
+    'practical',
+    'uses',
+    'use',
+    'implementation',
+    'implementations',
+  ].map((token) => token.toLowerCase())
+);
+
+export function normalizeSearchQuery(searchQuery: string): string {
+  return searchQuery.trim().replace(/\s+/g, ' ').slice(0, 200);
+}
+
 /**
- * Deterministically bias YouTube search queries with level/style hints.
- * Keeps the planner query as the base; does not invent video IDs.
+ * Optional soft-bias query. Level/style are not mandatory search keywords;
+ * prefer base-topic queries and selection-time preference guidance.
  */
 export function augmentSearchQueryWithPreferences(
   searchQuery: string,
   preferences: PathLearningPreferences
 ): string {
-  const base = searchQuery.trim().replace(/\s+/g, ' ');
+  const base = normalizeSearchQuery(searchQuery);
   if (!base) {
     return base;
   }
   const hints = `${LEVEL_SEARCH_HINT[preferences.level]} ${STYLE_SEARCH_HINT[preferences.style]}`;
   const combined = `${base} ${hints}`.trim();
   return combined.slice(0, 200);
+}
+
+/**
+ * Entity-preserving broader query: drop level/style/generic filler tokens.
+ * Returns null when no meaningfully broader query exists.
+ */
+export function buildBroaderSearchQuery(searchQuery: string): string | null {
+  const base = normalizeSearchQuery(searchQuery);
+  if (!base) {
+    return null;
+  }
+  const kept = base
+    .split(' ')
+    .filter((token) => !SEARCH_QUERY_BROADER_FILLER.has(token.toLowerCase()));
+  if (kept.length === 0) {
+    return null;
+  }
+  const broader = kept.slice(0, 6).join(' ').slice(0, 200);
+  if (!broader || broader.toLowerCase() === base.toLowerCase()) {
+    return null;
+  }
+  return broader;
+}
+
+function pushUniqueSearchQuery(ladder: string[], query: string | null): void {
+  if (!query) {
+    return;
+  }
+  const normalized = query.toLowerCase();
+  if (ladder.some((existing) => existing.toLowerCase() === normalized)) {
+    return;
+  }
+  ladder.push(query);
+}
+
+/**
+ * Bounded recall ladder per stage:
+ * 1) base topic/entity query (primary),
+ * 2) preference-enriched soft bias,
+ * 3) broader entity-preserving fallback when still insufficient.
+ * Does not invent video IDs.
+ */
+export function buildStageSearchQueryLadder(
+  searchQuery: string,
+  preferences: PathLearningPreferences
+): string[] {
+  const base = normalizeSearchQuery(searchQuery);
+  if (!base) {
+    return [];
+  }
+  const ladder: string[] = [];
+  pushUniqueSearchQuery(ladder, base);
+  pushUniqueSearchQuery(
+    ladder,
+    augmentSearchQueryWithPreferences(base, preferences)
+  );
+  pushUniqueSearchQuery(ladder, buildBroaderSearchQuery(base));
+  return ladder;
+}
+
+/** Topic-miss copy — never use when candidates existed before a duration filter. */
+export function noTopicMatchFailureMessage(): string {
+  return 'No playable YouTube videos matched this path. Try refining the goal or learning preferences.';
 }
 
 export function maxVideoDurationSeconds(

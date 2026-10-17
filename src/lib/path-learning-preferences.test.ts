@@ -3,8 +3,11 @@ import { describe, it } from 'node:test';
 import {
   DEFAULT_PATH_LEARNING_PREFERENCES,
   augmentSearchQueryWithPreferences,
+  buildBroaderSearchQuery,
+  buildStageSearchQueryLadder,
   durationCapFailureMessage,
   filterCandidatesByMaxVideoDuration,
+  noTopicMatchFailureMessage,
   normalizePathLearningPreferences,
   parsePathCreateDraft,
   parsePathLearningPreferences,
@@ -115,10 +118,7 @@ describe('path learning preference serialization and persistence', () => {
     const legacy = resolvePathLearningInput('I know Linux');
     assert.equal(legacy.storedAsPreferences, false);
     assert.equal(legacy.legacyBackground, 'I know Linux');
-    assert.deepEqual(
-      legacy.preferences,
-      DEFAULT_PATH_LEARNING_PREFERENCES
-    );
+    assert.deepEqual(legacy.preferences, DEFAULT_PATH_LEARNING_PREFERENCES);
   });
 
   it('persists preferences on create and leaves old free-text background paths intact', async () => {
@@ -211,10 +211,7 @@ describe('path learning preference serialization and persistence', () => {
       background: 'I know Linux',
     });
     assert.equal(fromLegacy.legacyBackground, 'I know Linux');
-    assert.deepEqual(
-      fromLegacy.preferences,
-      DEFAULT_PATH_LEARNING_PREFERENCES
-    );
+    assert.deepEqual(fromLegacy.preferences, DEFAULT_PATH_LEARNING_PREFERENCES);
   });
 });
 
@@ -237,7 +234,10 @@ describe('duration filtering and search query propagation', () => {
       style: 'corporate',
     });
     assert.equal(capped.candidatesByStage.get(0)?.length, 1);
-    assert.equal(capped.candidatesByStage.get(0)?.[0]?.youtubeVideoId, 'aaaaaaaaaaa');
+    assert.equal(
+      capped.candidatesByStage.get(0)?.[0]?.youtubeVideoId,
+      'aaaaaaaaaaa'
+    );
     assert.equal(capped.rejectedCount, 2);
     assert.deepEqual(capped.emptyStages, []);
 
@@ -258,14 +258,17 @@ describe('duration filtering and search query propagation', () => {
     assert.equal(uncapped.candidatesByStage.get(0)?.length, 3);
     assert.equal(uncapped.rejectedCount, 0);
 
-    assert.match(durationCapFailureMessage({
-      level: 'beginner',
-      maxVideoDurationMinutes: 15,
-      style: 'corporate',
-    }), /15-minute/);
+    assert.match(
+      durationCapFailureMessage({
+        level: 'beginner',
+        maxVideoDurationMinutes: 15,
+        style: 'corporate',
+      }),
+      /15-minute/
+    );
   });
 
-  it('augments search queries with level and style hints', () => {
+  it('augments search queries with level and style hints as optional soft bias', () => {
     const query = augmentSearchQueryWithPreferences('kubernetes basics', {
       level: 'advanced',
       maxVideoDurationMinutes: null,
@@ -274,6 +277,30 @@ describe('duration filtering and search query propagation', () => {
     assert.match(query, /kubernetes basics/);
     assert.match(query, /advanced/);
     assert.match(query, /academic/);
+  });
+
+  it('builds a base-first ladder with broader entity-preserving fallback', () => {
+    const ladder = buildStageSearchQueryLadder(
+      'Jev TypeSafe AI decision model walkthrough',
+      {
+        level: 'beginner',
+        maxVideoDurationMinutes: null,
+        style: 'corporate',
+      }
+    );
+    assert.equal(ladder[0], 'Jev TypeSafe AI decision model walkthrough');
+    assert.ok(ladder.some((query) => /beginner/.test(query)));
+    assert.ok(ladder.some((query) => /professional corporate/.test(query)));
+    const broader = buildBroaderSearchQuery(
+      'Jev TypeSafe AI decision model walkthrough'
+    );
+    assert.ok(broader);
+    assert.match(String(broader), /Jev/);
+    assert.match(String(broader), /TypeSafe/);
+    assert.doesNotMatch(String(broader), /walkthrough/i);
+    assert.ok(ladder.includes(String(broader)));
+    assert.equal(new Set(ladder).size, ladder.length);
+    assert.match(noTopicMatchFailureMessage(), /matched this path/);
   });
 });
 
@@ -298,9 +325,6 @@ describe('path create draft local storage compatibility', () => {
     );
     assert.ok(legacy);
     assert.equal(legacy?.goal, 'Learn darts');
-    assert.deepEqual(
-      legacy?.preferences,
-      DEFAULT_PATH_LEARNING_PREFERENCES
-    );
+    assert.deepEqual(legacy?.preferences, DEFAULT_PATH_LEARNING_PREFERENCES);
   });
 });
