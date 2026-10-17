@@ -67,10 +67,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Owner is always derived from the session — never from the client body.
-    // Clean display metadata at create time; raw goal/background stay for research.
+    // Clean display metadata at create time; raw goal stays for research.
+    // Structured preferences are not free-text background for cleanup prompts.
     const display = await resolveConfiguredPathDisplayMetadata({
       goal: validation.data.goal,
-      background: validation.data.background,
+      background: validation.data.preferences
+        ? null
+        : validation.data.background,
       title: validation.data.title,
     });
 

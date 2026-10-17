@@ -6,6 +6,19 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
+import {
+  DEFAULT_PATH_LEARNING_PREFERENCES,
+  PATH_CREATE_DRAFT_STORAGE_KEY,
+  PATH_LEARNING_LEVELS,
+  PATH_LEARNING_STYLES,
+  PATH_MAX_VIDEO_DURATION_MINUTES_OPTIONS,
+  parsePathCreateDraft,
+  serializePathCreateDraft,
+  type PathLearningLevel,
+  type PathLearningPreferences,
+  type PathLearningStyle,
+  type PathMaxVideoDurationMinutes,
+} from '@/lib/path-learning-preferences';
 
 function researchIdempotencyStorageKey(pathId: string): string {
   return `savedtube:research-idempotency:${pathId}`;
@@ -39,17 +52,103 @@ const researchProgressMoments = [
   'Shaping a sequence you can return to...',
 ] as const;
 
+const selectClassName =
+  'mt-2 w-full rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-stone-100 outline-none transition focus:border-amber-200/40 focus:bg-white/[0.055]';
+
+const LEVEL_LABELS: Record<PathLearningLevel, string> = {
+  beginner: 'Beginner',
+  intermediate: 'Intermediate',
+  advanced: 'Advanced',
+};
+
+const STYLE_LABELS: Record<PathLearningStyle, string> = {
+  corporate: 'Corporate',
+  fun: 'Fun',
+  academic: 'Academic',
+};
+
+function durationOptionLabel(
+  minutes: PathMaxVideoDurationMinutes
+): string {
+  if (minutes === null) {
+    return 'No limit';
+  }
+  return `${minutes} minutes`;
+}
+
+function durationSelectValue(
+  minutes: PathMaxVideoDurationMinutes
+): string {
+  return minutes === null ? 'none' : String(minutes);
+}
+
+function parseDurationSelectValue(
+  value: string
+): PathMaxVideoDurationMinutes {
+  if (value === 'none') {
+    return null;
+  }
+  const parsed = Number(value);
+  if (
+    parsed === 5 ||
+    parsed === 10 ||
+    parsed === 15 ||
+    parsed === 20 ||
+    parsed === 30 ||
+    parsed === 60
+  ) {
+    return parsed;
+  }
+  return null;
+}
+
 export default function NewPathPage() {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
   const [goal, setGoal] = useState('');
-  const [background, setBackground] = useState('');
+  const [preferences, setPreferences] = useState<PathLearningPreferences>(
+    () => ({ ...DEFAULT_PATH_LEARNING_PREFERENCES })
+  );
+  const [draftHydrated, setDraftHydrated] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createPhase, setCreatePhase] = useState<
     'idle' | 'saving' | 'researching'
   >('idle');
   const [researchBeat, setResearchBeat] = useState(0);
+
+  useEffect(() => {
+    try {
+      const restored = parsePathCreateDraft(
+        window.localStorage.getItem(PATH_CREATE_DRAFT_STORAGE_KEY)
+      );
+      if (restored) {
+        setGoal(restored.goal);
+        setPreferences(restored.preferences);
+      }
+    } catch {
+      // localStorage may be unavailable.
+    }
+    setDraftHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!draftHydrated || isCreating) {
+      return;
+    }
+    try {
+      if (!goal.trim()) {
+        window.localStorage.removeItem(PATH_CREATE_DRAFT_STORAGE_KEY);
+        return;
+      }
+      window.localStorage.setItem(
+        PATH_CREATE_DRAFT_STORAGE_KEY,
+        serializePathCreateDraft({ goal, preferences })
+      );
+    } catch {
+      // Ignore persistence failures.
+    }
+  }, [goal, preferences, draftHydrated, isCreating]);
 
   useEffect(() => {
     if (createPhase !== 'researching') {
@@ -79,7 +178,7 @@ export default function NewPathPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           goal,
-          background: background.trim() ? background : null,
+          preferences,
         }),
       });
 
@@ -106,7 +205,12 @@ export default function NewPathPage() {
       const researchData = await researchResponse.json().catch(() => ({}));
 
       setGoal('');
-      setBackground('');
+      setPreferences({ ...DEFAULT_PATH_LEARNING_PREFERENCES });
+      try {
+        window.localStorage.removeItem(PATH_CREATE_DRAFT_STORAGE_KEY);
+      } catch {
+        // Ignore.
+      }
 
       // Always open the saved path — research failure must not discard the shell.
       const query =
@@ -213,8 +317,9 @@ export default function NewPathPage() {
             What do you want to learn?
           </h1>
           <p className="mt-5 max-w-2xl text-lg leading-8 text-stone-400">
-            Save your goal, then research a bounded sequence of real YouTube
-            videos. Reloading a path never starts another model call.
+            Save your learning goal and preferences, then research a bounded
+            sequence of real YouTube videos. Reloading a path never starts
+            another model call.
           </p>
           {isCreating ? (
             <div
@@ -263,9 +368,12 @@ export default function NewPathPage() {
           onSubmit={handleCreate}
           className="mb-10 max-w-3xl rounded-[1.5rem] border border-white/10 bg-[#10100d]/90 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur sm:p-6"
         >
-          <label className="block">
-            <span className="text-sm font-medium text-stone-200">Goal</span>
+          <label className="block" htmlFor="path-learning-goal">
+            <span className="text-sm font-medium text-stone-200">
+              Learning goal
+            </span>
             <textarea
+              id="path-learning-goal"
               value={goal}
               onChange={(event) => setGoal(event.target.value)}
               required
@@ -276,20 +384,82 @@ export default function NewPathPage() {
             />
           </label>
 
-          <label className="mt-5 block">
-            <span className="text-sm font-medium text-stone-200">
-              Background{' '}
-              <span className="font-normal text-stone-500">(optional)</span>
-            </span>
-            <textarea
-              value={background}
-              onChange={(event) => setBackground(event.target.value)}
-              rows={3}
-              maxLength={2000}
-              placeholder="e.g. I already administer Linux servers"
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-stone-100 placeholder:text-stone-500 outline-none transition focus:border-amber-200/40 focus:bg-white/[0.055]"
-            />
-          </label>
+          <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <label className="block" htmlFor="path-learning-level">
+              <span className="text-sm font-medium text-stone-200">Level</span>
+              <select
+                id="path-learning-level"
+                value={preferences.level}
+                onChange={(event) =>
+                  setPreferences((current) => ({
+                    ...current,
+                    level: event.target.value as PathLearningLevel,
+                  }))
+                }
+                className={selectClassName}
+              >
+                {PATH_LEARNING_LEVELS.map((level) => (
+                  <option key={level} value={level}>
+                    {LEVEL_LABELS[level]}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block" htmlFor="path-max-video-duration">
+              <span className="text-sm font-medium text-stone-200">
+                Max length
+              </span>
+              <select
+                id="path-max-video-duration"
+                value={durationSelectValue(preferences.maxVideoDurationMinutes)}
+                onChange={(event) =>
+                  setPreferences((current) => ({
+                    ...current,
+                    maxVideoDurationMinutes: parseDurationSelectValue(
+                      event.target.value
+                    ),
+                  }))
+                }
+                className={selectClassName}
+              >
+                {PATH_MAX_VIDEO_DURATION_MINUTES_OPTIONS.map((minutes) => (
+                  <option
+                    key={durationSelectValue(minutes)}
+                    value={durationSelectValue(minutes)}
+                  >
+                    {durationOptionLabel(minutes)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block" htmlFor="path-learning-style">
+              <span className="text-sm font-medium text-stone-200">Style</span>
+              <select
+                id="path-learning-style"
+                value={preferences.style}
+                onChange={(event) =>
+                  setPreferences((current) => ({
+                    ...current,
+                    style: event.target.value as PathLearningStyle,
+                  }))
+                }
+                className={selectClassName}
+              >
+                {PATH_LEARNING_STYLES.map((style) => (
+                  <option key={style} value={style}>
+                    {STYLE_LABELS[style]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <p className="mt-2 text-xs leading-5 text-stone-500">
+            Max length is the maximum duration per video. Level and style guide
+            search and selection; the duration cap is enforced from verified
+            YouTube metadata.
+          </p>
 
           {createError && (
             <p className="mt-4 text-sm text-red-300" role="alert">

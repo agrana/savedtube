@@ -26,6 +26,14 @@ import { filterObviousPromotionalCandidates } from './path-content-policy';
 import type { PathRecord } from './paths';
 import { getOwnedPath, resolveOwnedPathAccess } from './paths';
 import {
+  augmentSearchQueryWithPreferences,
+  durationCapFailureMessage,
+  filterCandidatesByMaxVideoDuration,
+  preferencesFromResearchSnapshot,
+  resolvePathLearningInput,
+  type PathLearningPreferences,
+} from './path-learning-preferences';
+import {
   assertSelectionRespectsPathVideoRules,
   buildPathVideoRuleResearchSnapshot,
   filterResearchCandidatesByPathVideoRules,
@@ -67,6 +75,7 @@ export type ResearchLlmProvider = {
   planStages: (input: {
     goal: string;
     background: string | null;
+    preferences: PathLearningPreferences;
     maxStages: number;
     pathVideoRuleConstraints?: PathVideoRulePromptConstraints | null;
     signal?: AbortSignal;
@@ -75,6 +84,7 @@ export type ResearchLlmProvider = {
   selectVideos: (input: {
     goal: string;
     background: string | null;
+    preferences: PathLearningPreferences;
     plan: ResearchPlan;
     candidatesByStage: ReadonlyMap<number, ReadonlyArray<ResearchCandidate>>;
     maxVideosPerStage: number;
@@ -585,9 +595,11 @@ export async function claimResearchJob(args: {
     };
   }
 
+  const learningInput = resolvePathLearningInput(path.background);
   const inputSnapshot = {
     goal: path.goal,
-    background: path.background,
+    background: learningInput.legacyBackground,
+    preferences: learningInput.preferences,
     title: path.title,
     pathId: path.id,
   };
@@ -685,6 +697,7 @@ async function searchCandidatesForPlan(args: {
   youtube: YouTubeClient;
   accessToken: string;
   plan: ResearchPlan;
+  preferences: PathLearningPreferences;
   candidatesPerStage: number;
   timeoutMs: number;
   signal: AbortSignal;
@@ -711,7 +724,10 @@ async function searchCandidatesForPlan(args: {
     const stage = args.plan.stages[stageIndex];
     const search = await args.youtube.searchEmbeddableVideos({
       accessToken: args.accessToken,
-      query: stage.searchQuery,
+      query: augmentSearchQueryWithPreferences(
+        stage.searchQuery,
+        args.preferences
+      ),
       maxResults: args.candidatesPerStage,
       timeoutMs: args.timeoutMs,
       signal: args.signal,
@@ -953,10 +969,8 @@ export async function executeResearchPipeline(args: {
   job = started || job;
 
   const goal = String(job.input_snapshot.goal || '');
-  const background =
-    typeof job.input_snapshot.background === 'string'
-      ? job.input_snapshot.background
-      : null;
+  const { preferences, legacyBackground: background } =
+    preferencesFromResearchSnapshot(job.input_snapshot);
 
   const activeRulesResult = await loadActivePathVideoRulesForResearch(deps.db);
   if (!activeRulesResult.ok) {
@@ -970,7 +984,11 @@ export async function executeResearchPipeline(args: {
     excludedCandidates: [],
   });
   const snapshotWithRules = mergePathVideoRuleSnapshotIntoInput(
-    job.input_snapshot,
+    {
+      ...job.input_snapshot,
+      background,
+      preferences,
+    },
     ruleSnapshot
   );
   const snapshotUpdated = await updateJob(deps.db, job.id, {
@@ -985,6 +1003,7 @@ export async function executeResearchPipeline(args: {
   const planResult = await deps.llm.planStages({
     goal,
     background,
+    preferences,
     maxStages: settings.maxStages,
     pathVideoRuleConstraints,
     timeoutMs: settings.providerTimeoutMs,
@@ -1014,6 +1033,7 @@ export async function executeResearchPipeline(args: {
     youtube: deps.youtube,
     accessToken,
     plan,
+    preferences,
     candidatesPerStage: settings.candidatesPerStage,
     timeoutMs: settings.youtubeTimeoutMs,
     signal: controller.signal,
@@ -1032,7 +1052,7 @@ export async function executeResearchPipeline(args: {
   if (searchResult.emptyStages.length === plan.stages.length) {
     return fail(
       'no_candidates',
-      'No playable YouTube videos matched this path. Try refining the goal or background.',
+      'No playable YouTube videos matched this path. Try refining the goal or learning preferences.',
       'failed'
     );
   }
@@ -1043,8 +1063,23 @@ export async function executeResearchPipeline(args: {
   const marketingEmptyStages = [...marketingFiltered.candidatesByStage]
     .filter(([, candidates]) => candidates.length === 0)
     .map(([stageIndex]) => stageIndex);
+  const durationFiltered = filterCandidatesByMaxVideoDuration(
+    marketingFiltered.candidatesByStage,
+    preferences
+  );
+  if (
+    preferences.maxVideoDurationMinutes !== null &&
+    durationFiltered.emptyStages.length === plan.stages.length
+  ) {
+    return fail(
+      'no_candidates',
+      durationCapFailureMessage(preferences),
+      'failed'
+    );
+  }
+
   const filtered = filterResearchCandidatesByPathVideoRules({
-    candidatesByStage: marketingFiltered.candidatesByStage,
+    candidatesByStage: durationFiltered.candidatesByStage,
     rules: activeRulesResult.executableRules,
   });
   const candidatesByStage = filtered.candidatesByStage;
@@ -1052,6 +1087,7 @@ export async function executeResearchPipeline(args: {
     ...new Set([
       ...searchResult.emptyStages,
       ...marketingEmptyStages,
+      ...durationFiltered.emptyStages,
       ...filtered.emptyStages,
     ]),
   ].sort((a, b) => a - b);
@@ -1077,7 +1113,9 @@ export async function executeResearchPipeline(args: {
   if (emptyStagesAfterRules.length === plan.stages.length) {
     return fail(
       'no_candidates',
-      'No playable YouTube videos matched this path after applying active path video rules. Try refining the goal or background.',
+      preferences.maxVideoDurationMinutes !== null
+        ? durationCapFailureMessage(preferences)
+        : 'No playable YouTube videos matched this path after applying active path video rules. Try refining the goal or learning preferences.',
       'failed'
     );
   }
@@ -1090,6 +1128,7 @@ export async function executeResearchPipeline(args: {
   const selectionResult = await deps.llm.selectVideos({
     goal,
     background,
+    preferences,
     plan,
     candidatesByStage,
     maxVideosPerStage: settings.maxVideosPerStage,

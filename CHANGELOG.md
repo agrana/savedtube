@@ -4,6 +4,10 @@ This file records user-visible product changes and meaningful engineering change
 
 ## 2026-10-17
 
+### Added
+
+- Replaced free-text background on path creation with structured learning preferences: Level (Beginner / Intermediate / Advanced), Max length per video (No limit, 5–60 minutes), and Style (Corporate / Fun / Academic). Preferences validate server-side, persist without a schema migration, steer planning/search/selection, and enforce duration caps from verified YouTube metadata. Regeneration reuses stored preferences; legacy free-text background paths keep working.
+
 ### Changed
 
 - Hid the path sequence editor behind an **Edit sequence** disclosure next to **Regenerate draft**, so the map stays primary while editing remains available on demand with Done to close.

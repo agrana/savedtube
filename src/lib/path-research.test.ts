@@ -26,6 +26,10 @@ import {
 } from './path-research-service.ts';
 import { derivePathTitle, type PathRecord } from './paths.ts';
 import {
+  DEFAULT_PATH_LEARNING_PREFERENCES,
+  serializePathLearningPreferences,
+} from './path-learning-preferences.ts';
+import {
   RESEARCH_DEFAULT_MAX_DURATION_SECONDS,
   RESEARCH_MAX_STAGES,
   RESEARCH_MAX_VIDEOS_PER_STAGE,
@@ -209,7 +213,11 @@ function createFakeYouTube(handlers?: {
     searchEmbeddableVideos:
       handlers?.search ||
       (async ({ query }) => {
-        const found = catalog.get(query) || [];
+        const exact = catalog.get(query);
+        const prefixMatch = [...catalog.entries()].find(([key]) =>
+          query.startsWith(key)
+        )?.[1];
+        const found = exact || prefixMatch || [];
         return { ok: true, videoIds: found.map((item) => item.youtubeVideoId) };
       }),
     fetchVideoDetails:
@@ -1409,6 +1417,243 @@ describe('transactional persistence', () => {
     );
     assert.equal(db.revisions.length, 0);
     assert.equal(db.videos.length, 0);
+  });
+});
+
+describe('learning preferences in research pipeline', () => {
+  it('stores preferences on claim and reuses them on regeneration', async () => {
+    const preferences = {
+      level: 'intermediate' as const,
+      maxVideoDurationMinutes: 15 as const,
+      style: 'academic' as const,
+    };
+    const path = makePath({
+      id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      owner: 'user-a',
+      goal: 'Pass the CKA',
+      background: serializePathLearningPreferences(preferences),
+    });
+    const db = createMemoryResearchDb([path]);
+    const planPreferences: unknown[] = [];
+    const selectPreferences: unknown[] = [];
+    const searchQueries: string[] = [];
+
+    const result = await runPathResearch({
+      deps: makeDeps({
+        db,
+        llm: createFakeLlm({
+          planStages: async (input) => {
+            planPreferences.push(input.preferences);
+            return {
+              ok: true,
+              data: defaultPlan(),
+              latencyMs: 1,
+            };
+          },
+          selectVideos: async (input) => {
+            selectPreferences.push(input.preferences);
+            const stages: ResearchSelection['stages'] = [];
+            for (const [stageIndex, candidates] of input.candidatesByStage) {
+              if (candidates.length === 0) continue;
+              stages.push({
+                stageIndex,
+                videoIds: [candidates[0].youtubeVideoId],
+                reasons: ['Relevant verified candidate'],
+              });
+            }
+            return { ok: true, data: { stages }, latencyMs: 1 };
+          },
+        }),
+        youtube: createFakeYouTube({
+          search: async ({ query }) => {
+            searchQueries.push(query);
+            const catalog = new Map([
+              [
+                'kubernetes basics',
+                [candidate('aaaaaaaaaaa'), candidate('bbbbbbbbbbb')],
+              ],
+              [
+                'kubernetes practice',
+                [candidate('ccccccccccc'), candidate('ddddddddddd')],
+              ],
+            ]);
+            const prefixMatch = [...catalog.entries()].find(([key]) =>
+              query.startsWith(key)
+            )?.[1];
+            return {
+              ok: true,
+              videoIds: (prefixMatch || []).map((item) => item.youtubeVideoId),
+            };
+          },
+          details: async ({ videoIds }) => {
+            const all = [
+              candidate('aaaaaaaaaaa'),
+              candidate('bbbbbbbbbbb'),
+              candidate('ccccccccccc'),
+              candidate('ddddddddddd'),
+            ];
+            const byId = new Map(all.map((item) => [item.youtubeVideoId, item]));
+            return {
+              ok: true,
+              candidates: videoIds
+                .map((id) => byId.get(id))
+                .filter((item): item is ResearchCandidate => Boolean(item)),
+            };
+          },
+        }),
+      }),
+      ownerId: 'user-a',
+      pathId: path.id,
+      idempotencyKey: 'prefs-claim-aaaaaaa',
+      accessToken: 'token',
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(db.jobs[0]?.input_snapshot.preferences, preferences);
+    assert.equal(db.jobs[0]?.input_snapshot.background, null);
+    assert.deepEqual(planPreferences[0], preferences);
+    assert.deepEqual(selectPreferences[0], preferences);
+    assert.ok(
+      searchQueries.some(
+        (query) =>
+          query.includes('intermediate') && query.includes('academic')
+      )
+    );
+
+    const second = await runPathResearch({
+      deps: makeDeps({ db }),
+      ownerId: 'user-a',
+      pathId: path.id,
+      idempotencyKey: 'prefs-regen-bbbbbbb',
+      accessToken: 'token',
+    });
+    assert.equal(second.ok, true);
+    const regenJob = db.jobs.find(
+      (job) => job.idempotency_key === 'prefs-regen-bbbbbbb'
+    );
+    assert.deepEqual(regenJob?.input_snapshot.preferences, preferences);
+  });
+
+  it('keeps old free-text background paths working with default preferences', async () => {
+    const path = makePath({
+      id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      owner: 'user-a',
+      goal: 'Pass the CKA',
+      background: 'I know Linux',
+    });
+    const db = createMemoryResearchDb([path]);
+    let receivedBackground: string | null = null;
+    let receivedPreferences: unknown = null;
+
+    const result = await runPathResearch({
+      deps: makeDeps({
+        db,
+        llm: createFakeLlm({
+          planStages: async (input) => {
+            receivedBackground = input.background;
+            receivedPreferences = input.preferences;
+            return {
+              ok: true,
+              data: defaultPlan(),
+              latencyMs: 1,
+            };
+          },
+        }),
+      }),
+      ownerId: 'user-a',
+      pathId: path.id,
+      idempotencyKey: 'legacy-bg-aaaaaaaa',
+      accessToken: 'token',
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(receivedBackground, 'I know Linux');
+    assert.deepEqual(
+      receivedPreferences,
+      DEFAULT_PATH_LEARNING_PREFERENCES
+    );
+    assert.equal(db.jobs[0]?.input_snapshot.background, 'I know Linux');
+  });
+
+  it('fails honestly when a duration cap removes all candidates, including unknown durations', async () => {
+    const preferences = {
+      level: 'beginner' as const,
+      maxVideoDurationMinutes: 5 as const,
+      style: 'corporate' as const,
+    };
+    const path = makePath({
+      id: '12121212-1212-4121-8121-121212121212',
+      owner: 'user-a',
+      goal: 'Pass the CKA',
+      background: serializePathLearningPreferences(preferences),
+    });
+    const db = createMemoryResearchDb([path]);
+    const longA = { ...candidate('aaaaaaaaaaa'), durationSeconds: 900 };
+    const unknownB = { ...candidate('bbbbbbbbbbb'), durationSeconds: null };
+    const longC = { ...candidate('ccccccccccc'), durationSeconds: 1200 };
+    const unknownD = { ...candidate('ddddddddddd'), durationSeconds: null };
+
+    const result = await runPathResearch({
+      deps: makeDeps({
+        db,
+        youtube: createFakeYouTube({
+          catalog: new Map([
+            ['kubernetes basics', [longA, unknownB]],
+            ['kubernetes practice', [longC, unknownD]],
+          ]),
+        }),
+      }),
+      ownerId: 'user-a',
+      pathId: path.id,
+      idempotencyKey: 'duration-cap-aaaaaa',
+      accessToken: 'token',
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(db.jobs[0]?.status, 'failed');
+    assert.equal(db.jobs[0]?.error?.code, 'no_candidates');
+    assert.match(String(db.jobs[0]?.error?.message || ''), /5-minute/);
+    assert.equal(db.revisions.length, 0);
+  });
+
+  it('keeps unknown-duration candidates when max length is no limit', async () => {
+    const preferences = {
+      level: 'beginner' as const,
+      maxVideoDurationMinutes: null,
+      style: 'corporate' as const,
+    };
+    const path = makePath({
+      id: '13131313-1313-4131-8131-131313131313',
+      owner: 'user-a',
+      goal: 'Pass the CKA',
+      background: serializePathLearningPreferences(preferences),
+    });
+    const db = createMemoryResearchDb([path]);
+    const unknownA = { ...candidate('aaaaaaaaaaa'), durationSeconds: null };
+    const unknownC = { ...candidate('ccccccccccc'), durationSeconds: null };
+
+    const result = await runPathResearch({
+      deps: makeDeps({
+        db,
+        youtube: createFakeYouTube({
+          catalog: new Map([
+            ['kubernetes basics', [unknownA]],
+            ['kubernetes practice', [unknownC]],
+          ]),
+        }),
+      }),
+      ownerId: 'user-a',
+      pathId: path.id,
+      idempotencyKey: 'duration-none-aaaaa',
+      accessToken: 'token',
+    });
+
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.job.status, 'succeeded');
+    }
+    assert.equal(db.videos.length, 2);
+    assert.equal(db.videos[0]?.duration_seconds, null);
   });
 });
 

@@ -291,6 +291,25 @@ describe('path validation', () => {
     if (result.success) {
       assert.equal(result.data.goal, 'Pass the CKA');
       assert.equal(result.data.background, 'Linux admin');
+      assert.equal(result.data.preferences, null);
+    }
+
+    const withPreferences = parseCreatePathBody({
+      goal: 'Pass the CKA',
+      preferences: {
+        level: 'advanced',
+        maxVideoDurationMinutes: 10,
+        style: 'academic',
+      },
+    });
+    assert.equal(withPreferences.success, true);
+    if (withPreferences.success) {
+      assert.equal(withPreferences.data.background, null);
+      assert.deepEqual(withPreferences.data.preferences, {
+        level: 'advanced',
+        maxVideoDurationMinutes: 10,
+        style: 'academic',
+      });
     }
   });
 

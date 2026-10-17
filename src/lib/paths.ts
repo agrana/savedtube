@@ -1,5 +1,11 @@
 import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+  normalizePathLearningPreferences,
+  pathLearningPreferencesInputSchema,
+  serializePathLearningPreferences,
+  type PathLearningPreferences,
+} from './path-learning-preferences';
 
 export const PATH_GOAL_MAX_LENGTH = 500;
 export const PATH_BACKGROUND_MAX_LENGTH = 2000;
@@ -28,6 +34,8 @@ export const createPathSchema = z.object({
     .optional()
     .nullable()
     .transform((value) => (value && value.length > 0 ? value : null)),
+  /** Structured learning levers; validated server-side when present. */
+  preferences: pathLearningPreferencesInputSchema.optional(),
   title: z
     .string()
     .trim()
@@ -74,6 +82,8 @@ export const pathListQuerySchema = z.object({
 export type CreatePathInput = {
   goal: string;
   background: string | null;
+  /** When set, persisted as structured JSON in background (no migration). */
+  preferences?: PathLearningPreferences | null;
   title?: string | null;
   /** Cleaned learner-facing objective; defaults to wording-preserving goal. */
   display_objective?: string | null;
@@ -169,11 +179,23 @@ export function parseCreatePathBody(body: unknown) {
   if (!parsed.success) {
     return parsed;
   }
+
+  const hasPreferencesKey =
+    body !== null &&
+    typeof body === 'object' &&
+    Object.prototype.hasOwnProperty.call(body, 'preferences');
+
+  const preferences = hasPreferencesKey
+    ? normalizePathLearningPreferences(parsed.data.preferences ?? {})
+    : null;
+
   return {
     success: true as const,
     data: {
       goal: parsed.data.goal,
-      background: parsed.data.background ?? null,
+      // Structured prefs replace free-text background for new creates.
+      background: preferences ? null : (parsed.data.background ?? null),
+      preferences,
       title: parsed.data.title ?? null,
     } satisfies CreatePathInput,
   };
@@ -282,8 +304,11 @@ export async function createOwnedPath(
     fallbackDisplay.display_path;
   // Prefer cleaned path label for the stored title so existing title consumers stay aligned.
   const title = display_path;
-  const background =
-    input.background && input.background.length > 0 ? input.background : null;
+  const background = input.preferences
+    ? serializePathLearningPreferences(input.preferences)
+    : input.background && input.background.length > 0
+      ? input.background
+      : null;
 
   const { data, error } = await client
     .from('paths')
