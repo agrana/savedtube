@@ -10,6 +10,7 @@ import {
 import { parseResearchRequestBody } from '@/lib/path-research-schema';
 import { withEffectiveUserDailyBudget } from '@/lib/research-user-budget';
 import { createServerSupabaseClient } from '@/lib/supabase';
+import { httpStatusForYouTubeErrorCode } from '@/lib/youtube-data-errors';
 
 /**
  * Vercel function duration. Next requires a static numeric literal here.
@@ -96,13 +97,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
     });
 
     if (!result.ok) {
+      const youtubeStatus = httpStatusForYouTubeErrorCode(result.code);
       const status =
-        result.code === 'youtube_quota' ||
-        result.code === 'user_budget_exhausted' ||
+        youtubeStatus ??
+        (result.code === 'user_budget_exhausted' ||
         result.code === 'project_budget_exhausted' ||
         result.code === 'model_rate_limited'
           ? 429
-          : result.status;
+          : result.status);
 
       // Ownership failures stay 404 with a stable code (no existence leak).
       const code =

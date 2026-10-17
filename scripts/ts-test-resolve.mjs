@@ -3,6 +3,14 @@
  * so --experimental-strip-types can load the same modules Next.js bundles.
  */
 export async function resolve(specifier, context, nextResolve) {
+  // Next's server-only package throws outside the bundler; tests need a no-op.
+  if (specifier === 'server-only') {
+    return {
+      shortCircuit: true,
+      url: 'data:text/javascript,export default {};',
+    };
+  }
+
   if (
     specifier.startsWith('.') ||
     specifier.startsWith('/')

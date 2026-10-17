@@ -18,7 +18,8 @@ This is the canonical list of unfinished, deferred, and deliberately pending Sav
 
 - [ ] Complete the remaining full-duration YouTube playback and playback-reset regression checks recorded in [`docs/ux-audit-2026-10-10.md`](docs/ux-audit-2026-10-10.md).
 - [ ] Expand route and end-to-end learning-flow coverage.
-- [ ] Improve research observability and user-facing explanations.
+- [ ] Improve research observability beyond YouTube adapter classification (model/provider phases, job timeline UX). YouTube status/reason allowlisting and typed public messages shipped 2026-10-17; production root cause for recurring search failures remains unverified until read-only Vercel logs are available (local CLI was logged out; `VERCEL_TOKEN` exists only as a GitHub Actions secret and was not used).
+- [ ] After Vercel production log access is available, confirm the dominant allowlisted YouTube reason/status for recent search failures and only then consider auth-refresh follow-ups if evidence shows expiry.
 - [ ] Optionally add live read-only YouTube discovery smoke coverage for niche entity recall once a non-mutating API credential path is available in CI or local agent environments.
 
 ## Product-direction follow-ups

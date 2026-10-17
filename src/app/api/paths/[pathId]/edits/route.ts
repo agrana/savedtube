@@ -12,6 +12,7 @@ import {
 import { loadOwnedPathDetail } from '@/lib/path-research';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { createYouTubeDataClient } from '@/lib/youtube-data';
+import { httpStatusForYouTubeErrorCode } from '@/lib/youtube-data-errors';
 import { config } from '@/lib/config';
 import { isObviousPromotionalCandidate } from '@/lib/path-content-policy';
 
@@ -73,18 +74,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
       });
 
       if (!details.ok) {
+        const mapped = httpStatusForYouTubeErrorCode(details.code);
         const status =
-          details.code === 'youtube_quota'
-            ? 429
-            : details.status && details.status >= 400 && details.status < 600
-              ? details.status
-              : 502;
+          mapped ??
+          (details.status && details.status >= 400 && details.status < 600
+            ? details.status
+            : 502);
         return NextResponse.json(
           {
-            error:
-              details.code === 'youtube_quota'
-                ? 'YouTube quota exceeded. Try again later.'
-                : 'Failed to validate video URL',
+            error: details.message || 'Failed to validate video URL',
             code: details.code,
           },
           { status }

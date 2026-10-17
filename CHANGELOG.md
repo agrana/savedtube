@@ -4,6 +4,10 @@ This file records user-visible product changes and meaningful engineering change
 
 ## 2026-10-17
 
+### Fixed
+
+- Classified YouTube Data API failures from allowlisted upstream status/reason instead of mapping every 403 to quota and collapsing other errors into a generic search failure. Public messages now distinguish expired sign-in, quota vs permission/access, rate limits, transient 5xx/network, and timeouts. Structured logs keep only allowlisted fields (no raw provider bodies, URLs, or tokens). Transient 5xx/429/network failures use a small bounded retry with Retry-After capped to the request deadline; auth, quota, and permission failures fail fast without climbing the research query ladder.
+
 ### Changed
 
 - Renamed path detail **Regenerate draft** to **Regenerate**. The control now opens the path creation form prefilled from the authenticated owned path id (`fromPath`) with the original stored goal prompt and Level / Max length / Style — no research call on click. Explicit submit updates the same path then researches; fresh-create drafts stay compatible. Invalid, unauthorized, or missing source paths fail closed without an empty create. Research idempotency keys are scoped to a form-visit intent plus the canonical edited goal/preferences (retries reuse; edited settings or a new visit mint a fresh key; terminal success/failure clears). Switching from regenerate to fresh `/paths/new` without a stored draft clears the old goal and preferences. Regenerating a legacy free-text background path preserves that text in an optional `legacyBackground` field on the structured preferences envelope so research still receives it.

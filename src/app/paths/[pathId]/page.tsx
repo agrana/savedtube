@@ -66,6 +66,18 @@ function researchFailureMessage(
       return 'No playable YouTube videos matched this path. Try refining the goal or background.';
     case 'youtube_quota':
       return 'YouTube search quota is exhausted. Try again later.';
+    case 'youtube_auth':
+      return 'YouTube sign-in expired. Reconnect Google and try again.';
+    case 'youtube_permission':
+      return 'YouTube access is not available for this account right now.';
+    case 'youtube_rate_limited':
+      return 'YouTube is rate-limiting requests. Try again shortly.';
+    case 'youtube_unavailable':
+    case 'youtube_network':
+      return 'YouTube is temporarily unavailable. Try again later.';
+    case 'youtube_search_failed':
+    case 'youtube_details_failed':
+      return 'YouTube search failed. Your saved goal is intact — retry when ready.';
     case 'user_budget_exhausted':
     case 'project_budget_exhausted':
       return 'Research budget is exhausted for today.';

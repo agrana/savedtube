@@ -2,6 +2,14 @@ import 'server-only';
 
 import type { ResearchCandidate } from './path-research-schema';
 import { YOUTUBE_VIDEO_ID_REGEX } from './path-research-schema';
+import {
+  classifyYouTubeHttpError,
+  classifyYouTubeTransportError,
+  parseRetryAfterMs,
+  parseYouTubeUpstreamErrorBody,
+  youtubeErrorLogFields,
+  type YouTubeOperation,
+} from './youtube-data-errors';
 
 export type YouTubeSearchParams = {
   accessToken: string;
@@ -55,6 +63,21 @@ export type YouTubeClient = {
   >;
 };
 
+export type YouTubeDataClientOptions = {
+  fetch?: typeof fetch;
+  sleep?: (ms: number) => Promise<void>;
+  /** Max attempts including the first try. Bounded; default 3. */
+  maxAttempts?: number;
+  /** Base backoff for transient retries (doubles each attempt). Default 200ms. */
+  backoffBaseMs?: number;
+  /** Cap for Retry-After / backoff waits. Default 2000ms. */
+  maxRetryAfterMs?: number;
+};
+
+const DEFAULT_MAX_ATTEMPTS = 3;
+const DEFAULT_BACKOFF_BASE_MS = 200;
+const DEFAULT_MAX_RETRY_AFTER_MS = 2000;
+
 function withTimeoutSignal(
   timeoutMs: number,
   outer?: AbortSignal
@@ -107,73 +130,214 @@ function excerptDescription(description: string | undefined): string {
   return description.replace(/\s+/g, ' ').trim().slice(0, 500);
 }
 
-export function createYouTubeDataClient(): YouTubeClient {
-  return {
-    async searchEmbeddableVideos(params) {
-      const { signal, cleanup } = withTimeoutSignal(
-        params.timeoutMs,
-        params.signal
-      );
-      try {
-        const url = new URL('https://www.googleapis.com/youtube/v3/search');
-        url.searchParams.set('part', 'snippet');
-        url.searchParams.set('type', 'video');
-        url.searchParams.set('videoEmbeddable', 'true');
-        url.searchParams.set('maxResults', String(params.maxResults));
-        url.searchParams.set('q', params.query);
-        // No automatic pagination — one bounded page per stage query.
+function defaultSleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-        const response = await fetch(url.toString(), {
-          headers: {
-            Authorization: `Bearer ${params.accessToken}`,
-            Accept: 'application/json',
-          },
-          signal,
+async function fetchYouTubeJson(args: {
+  operation: YouTubeOperation;
+  url: URL;
+  accessToken: string;
+  timeoutMs: number;
+  signal?: AbortSignal;
+  fetchImpl: typeof fetch;
+  sleep: (ms: number) => Promise<void>;
+  maxAttempts: number;
+  backoffBaseMs: number;
+  maxRetryAfterMs: number;
+}): Promise<
+  | { ok: true; data: unknown }
+  | { ok: false; code: string; message: string; status?: number }
+> {
+  const deadline = Date.now() + args.timeoutMs;
+  let lastFailure: {
+    code: string;
+    message: string;
+    status?: number;
+  } | null = null;
+
+  for (let attempt = 1; attempt <= args.maxAttempts; attempt++) {
+    if (args.signal?.aborted || Date.now() >= deadline) {
+      return {
+        ok: false,
+        code: 'youtube_timeout',
+        message:
+          args.operation === 'search'
+            ? 'YouTube search timed out'
+            : 'YouTube details timed out',
+      };
+    }
+
+    const remainingMs = Math.max(1, deadline - Date.now());
+    const { signal, cleanup } = withTimeoutSignal(remainingMs, args.signal);
+
+    try {
+      const response = await args.fetchImpl(args.url.toString(), {
+        headers: {
+          Authorization: `Bearer ${args.accessToken}`,
+          Accept: 'application/json',
+        },
+        signal,
+      });
+
+      if (!response.ok) {
+        // Read body only to extract allowlisted reason; discard raw text.
+        const bodyText = await response.text();
+        const parsed = parseYouTubeUpstreamErrorBody(response.status, bodyText);
+        const classified = classifyYouTubeHttpError({
+          operation: args.operation,
+          httpStatus: parsed.httpStatus,
+          reason: parsed.reason,
         });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('YouTube search error:', response.status, errorText);
-          return {
-            ok: false,
-            code:
-              response.status === 403
-                ? 'youtube_quota'
-                : 'youtube_search_failed',
-            message:
-              response.status === 403
-                ? 'YouTube search quota exceeded. Try again later.'
-                : 'YouTube search failed',
-            status: response.status,
-          };
-        }
+        console.error(
+          'YouTube API error',
+          youtubeErrorLogFields({
+            operation: args.operation,
+            status: classified.status,
+            reason: classified.reason,
+            code: classified.code,
+            attempt,
+            retryable: classified.retryable,
+          })
+        );
 
-        const data = (await response.json()) as { items?: YouTubeSearchItem[] };
-        const videoIds = (data.items || [])
-          .map((item) => item.id?.videoId)
-          .filter(
-            (id): id is string =>
-              typeof id === 'string' && YOUTUBE_VIDEO_ID_REGEX.test(id)
-          );
-
-        return { ok: true, videoIds };
-      } catch (error) {
-        if (params.signal?.aborted || (error as Error)?.name === 'AbortError') {
-          return {
-            ok: false,
-            code: 'youtube_timeout',
-            message: 'YouTube search timed out',
-          };
-        }
-        console.error('YouTube search exception:', error);
-        return {
-          ok: false,
-          code: 'youtube_search_failed',
-          message: 'YouTube search failed',
+        lastFailure = {
+          code: classified.code,
+          message: classified.message,
+          status: classified.status,
         };
-      } finally {
-        cleanup();
+
+        const canRetry =
+          classified.retryable &&
+          attempt < args.maxAttempts &&
+          !args.signal?.aborted;
+
+        if (!canRetry) {
+          return { ok: false, ...lastFailure };
+        }
+
+        const retryAfterMs = parseRetryAfterMs(
+          response.headers.get('retry-after'),
+          args.backoffBaseMs * 2 ** (attempt - 1),
+          args.maxRetryAfterMs
+        );
+        const waitMs = Math.min(
+          retryAfterMs,
+          Math.max(0, deadline - Date.now())
+        );
+        if (waitMs > 0) {
+          await args.sleep(waitMs);
+        }
+        continue;
       }
+
+      const data: unknown = await response.json();
+      return { ok: true, data };
+    } catch (error) {
+      const classified = classifyYouTubeTransportError({
+        operation: args.operation,
+        error,
+        outerAborted: Boolean(args.signal?.aborted),
+      });
+
+      console.error(
+        'YouTube API transport error',
+        youtubeErrorLogFields({
+          operation: args.operation,
+          status: classified.status,
+          reason: classified.reason,
+          code: classified.code,
+          attempt,
+          retryable: classified.retryable,
+        })
+      );
+
+      lastFailure = {
+        code: classified.code,
+        message: classified.message,
+        status: classified.status,
+      };
+
+      const canRetry =
+        classified.retryable &&
+        attempt < args.maxAttempts &&
+        !args.signal?.aborted &&
+        Date.now() < deadline;
+
+      if (!canRetry) {
+        return { ok: false, ...lastFailure };
+      }
+
+      const waitMs = Math.min(
+        args.backoffBaseMs * 2 ** (attempt - 1),
+        args.maxRetryAfterMs,
+        Math.max(0, deadline - Date.now())
+      );
+      if (waitMs > 0) {
+        await args.sleep(waitMs);
+      }
+    } finally {
+      cleanup();
+    }
+  }
+
+  return {
+    ok: false,
+    code: lastFailure?.code || 'youtube_search_failed',
+    message: lastFailure?.message || 'YouTube search failed',
+    status: lastFailure?.status,
+  };
+}
+
+export function createYouTubeDataClient(
+  options: YouTubeDataClientOptions = {}
+): YouTubeClient {
+  const fetchImpl = options.fetch ?? fetch;
+  const sleep = options.sleep ?? defaultSleep;
+  const maxAttempts = Math.max(
+    1,
+    Math.min(options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS, 5)
+  );
+  const backoffBaseMs = options.backoffBaseMs ?? DEFAULT_BACKOFF_BASE_MS;
+  const maxRetryAfterMs = options.maxRetryAfterMs ?? DEFAULT_MAX_RETRY_AFTER_MS;
+
+  return {
+    async searchEmbeddableVideos(params) {
+      const url = new URL('https://www.googleapis.com/youtube/v3/search');
+      url.searchParams.set('part', 'snippet');
+      url.searchParams.set('type', 'video');
+      url.searchParams.set('videoEmbeddable', 'true');
+      url.searchParams.set('maxResults', String(params.maxResults));
+      url.searchParams.set('q', params.query);
+      // No automatic pagination — one bounded page per stage query.
+
+      const result = await fetchYouTubeJson({
+        operation: 'search',
+        url,
+        accessToken: params.accessToken,
+        timeoutMs: params.timeoutMs,
+        signal: params.signal,
+        fetchImpl,
+        sleep,
+        maxAttempts,
+        backoffBaseMs,
+        maxRetryAfterMs,
+      });
+
+      if (!result.ok) {
+        return result;
+      }
+
+      const data = result.data as { items?: YouTubeSearchItem[] };
+      const videoIds = (data.items || [])
+        .map((item) => item.id?.videoId)
+        .filter(
+          (id): id is string =>
+            typeof id === 'string' && YOUTUBE_VIDEO_ID_REGEX.test(id)
+        );
+
+      return { ok: true, videoIds };
     },
 
     async fetchVideoDetails(params) {
@@ -186,103 +350,71 @@ export function createYouTubeDataClient(): YouTubeClient {
         return { ok: true, candidates: [] };
       }
 
-      const { signal, cleanup } = withTimeoutSignal(
-        params.timeoutMs,
-        params.signal
-      );
-      try {
-        const candidates: ResearchCandidate[] = [];
+      const candidates: ResearchCandidate[] = [];
 
-        for (let i = 0; i < uniqueIds.length; i += 50) {
-          const batch = uniqueIds.slice(i, i + 50);
-          const url = new URL('https://www.googleapis.com/youtube/v3/videos');
-          url.searchParams.set('part', 'id,snippet,contentDetails,status');
-          url.searchParams.set('id', batch.join(','));
+      for (let i = 0; i < uniqueIds.length; i += 50) {
+        const batch = uniqueIds.slice(i, i + 50);
+        const url = new URL('https://www.googleapis.com/youtube/v3/videos');
+        url.searchParams.set('part', 'id,snippet,contentDetails,status');
+        url.searchParams.set('id', batch.join(','));
 
-          const response = await fetch(url.toString(), {
-            headers: {
-              Authorization: `Bearer ${params.accessToken}`,
-              Accept: 'application/json',
-            },
-            signal,
+        const result = await fetchYouTubeJson({
+          operation: 'videos',
+          url,
+          accessToken: params.accessToken,
+          timeoutMs: params.timeoutMs,
+          signal: params.signal,
+          fetchImpl,
+          sleep,
+          maxAttempts,
+          backoffBaseMs,
+          maxRetryAfterMs,
+        });
+
+        if (!result.ok) {
+          return result;
+        }
+
+        const data = result.data as { items?: YouTubeVideoItem[] };
+        for (const item of data.items || []) {
+          const id = item.id;
+          if (!id || !YOUTUBE_VIDEO_ID_REGEX.test(id)) {
+            continue;
+          }
+          if (item.status?.embeddable === false) {
+            continue;
+          }
+          if (
+            item.status?.privacyStatus &&
+            item.status.privacyStatus !== 'public' &&
+            item.status.privacyStatus !== 'unlisted'
+          ) {
+            continue;
+          }
+
+          const title = item.snippet?.title?.trim();
+          const channelTitle = item.snippet?.channelTitle?.trim();
+          if (!title || !channelTitle) {
+            continue;
+          }
+
+          candidates.push({
+            youtubeVideoId: id,
+            title: title.slice(0, 300),
+            channelTitle: channelTitle.slice(0, 200),
+            durationSeconds: parseYouTubeDurationSeconds(
+              item.contentDetails?.duration
+            ),
+            thumbnailUrl:
+              item.snippet?.thumbnails?.medium?.url ||
+              item.snippet?.thumbnails?.default?.url ||
+              null,
+            descriptionExcerpt: excerptDescription(item.snippet?.description),
           });
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error('YouTube videos error:', response.status, errorText);
-            return {
-              ok: false,
-              code:
-                response.status === 403
-                  ? 'youtube_quota'
-                  : 'youtube_details_failed',
-              message:
-                response.status === 403
-                  ? 'YouTube quota exceeded. Try again later.'
-                  : 'Failed to fetch YouTube video details',
-              status: response.status,
-            };
-          }
-
-          const data = (await response.json()) as {
-            items?: YouTubeVideoItem[];
-          };
-          for (const item of data.items || []) {
-            const id = item.id;
-            if (!id || !YOUTUBE_VIDEO_ID_REGEX.test(id)) {
-              continue;
-            }
-            if (item.status?.embeddable === false) {
-              continue;
-            }
-            if (
-              item.status?.privacyStatus &&
-              item.status.privacyStatus !== 'public' &&
-              item.status.privacyStatus !== 'unlisted'
-            ) {
-              continue;
-            }
-
-            const title = item.snippet?.title?.trim();
-            const channelTitle = item.snippet?.channelTitle?.trim();
-            if (!title || !channelTitle) {
-              continue;
-            }
-
-            candidates.push({
-              youtubeVideoId: id,
-              title: title.slice(0, 300),
-              channelTitle: channelTitle.slice(0, 200),
-              durationSeconds: parseYouTubeDurationSeconds(
-                item.contentDetails?.duration
-              ),
-              thumbnailUrl:
-                item.snippet?.thumbnails?.medium?.url ||
-                item.snippet?.thumbnails?.default?.url ||
-                null,
-              descriptionExcerpt: excerptDescription(item.snippet?.description),
-            });
-          }
         }
-
-        return { ok: true, candidates };
-      } catch (error) {
-        if (params.signal?.aborted || (error as Error)?.name === 'AbortError') {
-          return {
-            ok: false,
-            code: 'youtube_timeout',
-            message: 'YouTube details timed out',
-          };
-        }
-        console.error('YouTube details exception:', error);
-        return {
-          ok: false,
-          code: 'youtube_details_failed',
-          message: 'Failed to fetch YouTube video details',
-        };
-      } finally {
-        cleanup();
       }
+
+      return { ok: true, candidates };
     },
   };
 }
