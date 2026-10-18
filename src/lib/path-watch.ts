@@ -53,6 +53,11 @@ export async function loadOwnedPathWatchContext(
   const practiced = progress.summary.practicedVideoIds.includes(pathVideoId);
   const previousItem = index > 0 ? flat[index - 1] : null;
   const nextItem = index < flat.length - 1 ? flat[index + 1] : null;
+  const sequence = flat.map((item) => ({
+    pathVideoId: item.pathVideoId,
+    youtubeVideoId: item.youtubeVideoId,
+    title: item.title,
+  }));
 
   return {
     ok: true,
@@ -68,6 +73,7 @@ export async function loadOwnedPathWatchContext(
       practiced,
       position: index,
       total: flat.length,
+      sequence,
       previous: previousItem
         ? {
             pathVideoId: previousItem.pathVideoId,

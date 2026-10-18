@@ -390,10 +390,60 @@ describe('path-map empty / small / max handling', () => {
     );
     assert.ok(video && video.kind === 'video');
     assert.equal(video.practiced, true);
+    assert.equal(video.watchedCompleted, false);
     assert.equal(video.selected, true);
     assert.match(video.href, /\/watch\/fffffffffff\?/);
     assert.match(video.href, /pathId=/);
     assert.match(video.href, /pathVideoId=video-1/);
+  });
+
+  it('marks watched-completed separately from practiced for path return checks', () => {
+    const presentation = buildPathPresentation({
+      pathId: '11111111-1111-4111-8111-111111111111',
+      pathTitle: 'Path',
+      goal: 'Goal',
+      stages: [
+        makeStage({
+          id: 'stage-1',
+          position: 0,
+          videos: [
+            makeVideo({
+              id: 'video-1',
+              stage_id: 'stage-1',
+              position: 0,
+              youtube_video_id: 'fffffffffff',
+              title: 'Intro lesson',
+            }),
+            makeVideo({
+              id: 'video-2',
+              stage_id: 'stage-1',
+              position: 1,
+              youtube_video_id: 'ggggggggggg',
+              title: 'Next lesson',
+            }),
+          ],
+        }),
+      ],
+      practicedVideoIds: ['video-2'],
+      watchedCompletedVideoIds: ['video-1'],
+    });
+
+    const finished = presentation.orderedItems.find(
+      (item) => item.kind === 'video' && item.pathVideoId === 'video-1'
+    );
+    const practicedOnly = presentation.orderedItems.find(
+      (item) => item.kind === 'video' && item.pathVideoId === 'video-2'
+    );
+    assert.ok(finished && finished.kind === 'video');
+    assert.ok(practicedOnly && practicedOnly.kind === 'video');
+    assert.equal(finished.watchedCompleted, true);
+    assert.equal(finished.practiced, false);
+    assert.match(finished.ariaLabel, /finished/);
+    assert.doesNotMatch(finished.ariaLabel, /practiced/);
+    assert.equal(practicedOnly.watchedCompleted, false);
+    assert.equal(practicedOnly.practiced, true);
+    assert.match(practicedOnly.ariaLabel, /practiced/);
+    assert.doesNotMatch(practicedOnly.ariaLabel, /finished/);
   });
 
   it('caps max-sized paths at five stages and two videos each', () => {
@@ -543,6 +593,8 @@ describe('path-map accessibility structure', () => {
     assert.match(source, /href=\{node\.href\}/);
     assert.match(source, /href=\{lesson\.href\}/);
     assert.match(source, /href=\{stage\.primaryAction\.href\}/);
+    assert.match(source, /FinishedCheck/);
+    assert.match(source, /watchedCompleted/);
     assert.equal(source.includes('role="img"'), false);
     assert.equal(source.includes('fetch('), false);
     assert.equal(/openai|anthropic|generateText|llm/i.test(source), false);
@@ -561,6 +613,7 @@ describe('path-map accessibility structure', () => {
       source,
       /practicedVideoIds=\{pageState\.progress\?\.practicedVideoIds/
     );
+    assert.match(source, /watchedCompletedVideoIds=\{watchedCompletedIds\}/);
     assert.match(
       source,
       /completedStageIds=\{pageState\.progress\?\.completedStageIds/

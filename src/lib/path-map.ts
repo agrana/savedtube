@@ -109,6 +109,8 @@ export type PathMapVideoNode = {
   ariaLabel: string;
   href: string;
   practiced: boolean;
+  /** Natural YouTube end on this lesson — independent of practiced/mastery. */
+  watchedCompleted: boolean;
   selected: boolean;
   /** Explicit recommended-next lesson derived from practicedVideoIds only. */
   recommended: boolean;
@@ -133,6 +135,7 @@ export type PathMapStageLesson = {
   channelTitle: string | null;
   href: string;
   practiced: boolean;
+  watchedCompleted: boolean;
   selected: boolean;
   recommended: boolean;
   nodeId: string;
@@ -197,6 +200,7 @@ export type PathMapOrderedItem =
       ariaLabel: string;
       href: string;
       practiced: boolean;
+      watchedCompleted: boolean;
       selected: boolean;
       recommended: boolean;
     };
@@ -243,6 +247,8 @@ export type BuildPathPresentationInput = {
   goal: string;
   stages: PathStageWithVideos[];
   practicedVideoIds?: ReadonlyArray<string> | ReadonlySet<string>;
+  /** Device-local watched-to-end ids — never conflated with practiced. */
+  watchedCompletedVideoIds?: ReadonlyArray<string> | ReadonlySet<string>;
   completedStageIds?: ReadonlyArray<string> | ReadonlySet<string>;
   selectedPathVideoId?: string | null;
   selectedStageId?: string | null;
@@ -411,12 +417,16 @@ function stageAriaLabel(
 function videoAriaLabel(
   title: string,
   practicedFlag: boolean,
+  watchedCompleted: boolean,
   selected: boolean,
   recommended: boolean
 ): string {
   const parts = [`Video: ${title}`];
   if (recommended) {
     parts.push('recommended next');
+  }
+  if (watchedCompleted) {
+    parts.push('finished');
   }
   if (practicedFlag) {
     parts.push('practiced');
@@ -474,6 +484,7 @@ function leftCenter(rect: PathMapRect): { x: number; y: number } {
 type LessonSpineLayoutArgs = {
   orderedStages: PathStageWithVideos[];
   practiced: Set<string>;
+  watchedCompleted: Set<string>;
   completed: Set<string>;
   selectedPathVideoId: string | null;
   selectedStageId: string | null;
@@ -524,6 +535,7 @@ function buildVideoNode(
   args: LessonSpineLayoutArgs
 ): PathMapVideoNode {
   const practicedFlag = args.practiced.has(video.id);
+  const watchedCompletedFlag = args.watchedCompleted.has(video.id);
   const selected = args.selectedPathVideoId === video.id;
   const recommended = args.recommendedPathVideoId === video.id;
   return {
@@ -538,15 +550,13 @@ function buildVideoNode(
     ariaLabel: videoAriaLabel(
       video.title,
       practicedFlag,
+      watchedCompletedFlag,
       selected,
       recommended
     ),
-    href: args.buildVideoHref(
-      video.youtube_video_id,
-      args.pathId,
-      video.id
-    ),
+    href: args.buildVideoHref(video.youtube_video_id, args.pathId, video.id),
     practiced: practicedFlag,
+    watchedCompleted: watchedCompletedFlag,
     selected,
     recommended,
     rect,
@@ -757,6 +767,7 @@ export function buildPathPresentation(
   input: BuildPathPresentationInput
 ): PathPresentation {
   const practiced = toIdSet(input.practicedVideoIds);
+  const watchedCompleted = toIdSet(input.watchedCompletedVideoIds);
   const completed = toIdSet(input.completedStageIds);
   const selectedPathVideoId = input.selectedPathVideoId ?? null;
   const selectedStageId = input.selectedStageId ?? null;
@@ -788,6 +799,7 @@ export function buildPathPresentation(
   const stages: PathMapStageSummary[] = cappedStages.map((stage) => {
     const lessons: PathMapStageLesson[] = stage.videos.map((video) => {
       const practicedFlag = practiced.has(video.id);
+      const watchedCompletedFlag = watchedCompleted.has(video.id);
       const selected = selectedPathVideoId === video.id;
       const recommended = recommendedPathVideoId === video.id;
       return {
@@ -798,12 +810,14 @@ export function buildPathPresentation(
         channelTitle: video.channel_title,
         href: resolveVideoHref(video.youtube_video_id, input.pathId, video.id),
         practiced: practicedFlag,
+        watchedCompleted: watchedCompletedFlag,
         selected,
         recommended,
         nodeId: pathMapVideoNodeId(video.id),
         ariaLabel: videoAriaLabel(
           video.title,
           practicedFlag,
+          watchedCompletedFlag,
           selected,
           recommended
         ),
@@ -879,6 +893,7 @@ export function buildPathPresentation(
         ariaLabel: lesson.ariaLabel,
         href: lesson.href,
         practiced: lesson.practiced,
+        watchedCompleted: lesson.watchedCompleted,
         selected: lesson.selected,
         recommended: lesson.recommended,
       });
@@ -888,6 +903,7 @@ export function buildPathPresentation(
   const layoutArgs: LessonSpineLayoutArgs = {
     orderedStages: cappedStages,
     practiced,
+    watchedCompleted,
     completed,
     selectedPathVideoId,
     selectedStageId,

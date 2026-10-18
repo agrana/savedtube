@@ -618,6 +618,11 @@ export function loadDemoWatchContext(
     practiced: false,
     position: index,
     total: flat.length,
+    sequence: flat.map((item) => ({
+      pathVideoId: item.id,
+      youtubeVideoId: item.youtubeVideoId,
+      title: item.title,
+    })),
     previous: previous
       ? {
           pathVideoId: previous.id,

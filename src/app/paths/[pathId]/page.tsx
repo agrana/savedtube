@@ -29,6 +29,15 @@ import type {
 } from '@/lib/path-research-schema';
 import type { PathProgressSummary } from '@/lib/path-progress';
 import { buildPathWatchHref } from '@/lib/path-links';
+import {
+  buildPathResumeWatchHref,
+  buildResumeSequenceFromStages,
+  collectVideoResumeSeconds,
+  readPathResumeCursor,
+  readWatchedCompletedIds,
+  resolvePathResumeTarget,
+  resolvePlaybackAccountScope,
+} from '@/lib/path-playback-resume';
 
 type PageState =
   | { status: 'loading' }
@@ -141,6 +150,10 @@ export default function PathDetailPage() {
     PathVideoDismissalReviewItem[]
   >([]);
   const [isSequenceEditorOpen, setIsSequenceEditorOpen] = useState(false);
+  const [watchedCompletedIds, setWatchedCompletedIds] = useState<string[]>([]);
+  const accountScope = resolvePlaybackAccountScope(
+    (session?.user as { id?: string } | undefined)?.id
+  );
 
   const fetchPath = useCallback(async () => {
     if (!pathId) {
@@ -512,6 +525,51 @@ export default function PathDetailPage() {
     };
   }, [pageState]);
 
+  useEffect(() => {
+    if (pageState.status !== 'ready') {
+      setWatchedCompletedIds([]);
+      return;
+    }
+    setWatchedCompletedIds([...readWatchedCompletedIds(accountScope, pathId)]);
+  }, [pageState, accountScope, pathId]);
+
+  const resumePathHref = useMemo(() => {
+    if (pageState.status !== 'ready' || !pageState.progress?.continueTarget) {
+      return null;
+    }
+
+    const sequence = buildResumeSequenceFromStages(pageState.stages);
+    const continueTarget = pageState.progress.continueTarget;
+    if (sequence.length === 0) {
+      return buildPathResumeWatchHref(
+        continueTarget.youtubeVideoId,
+        pathId,
+        continueTarget.pathVideoId
+      );
+    }
+
+    const target = resolvePathResumeTarget({
+      sequence,
+      practicedVideoIds: new Set(pageState.progress.practicedVideoIds),
+      pathCursor: readPathResumeCursor(pathId),
+      videoResumeSeconds: collectVideoResumeSeconds(sequence),
+    });
+
+    if (!target) {
+      return buildPathResumeWatchHref(
+        continueTarget.youtubeVideoId,
+        pathId,
+        continueTarget.pathVideoId
+      );
+    }
+
+    return buildPathResumeWatchHref(
+      target.youtubeVideoId,
+      pathId,
+      target.pathVideoId
+    );
+  }, [pageState, pathId]);
+
   if (sessionStatus === 'loading') {
     return (
       <div className="min-h-screen bg-[#080806] text-stone-100 flex items-center justify-center">
@@ -642,13 +700,9 @@ export default function PathDetailPage() {
                           : ''}
                       </p>
                     )}
-                    {pageState.progress.continueTarget && (
+                    {resumePathHref && (
                       <Link
-                        href={buildPathWatchHref(
-                          pageState.progress.continueTarget.youtubeVideoId,
-                          pathId,
-                          pageState.progress.continueTarget.pathVideoId
-                        )}
+                        href={resumePathHref}
                         className="mt-3 inline-flex rounded-full bg-stone-100 px-4 py-2 text-sm font-medium text-stone-950 transition hover:bg-white"
                       >
                         Resume path
@@ -824,6 +878,7 @@ export default function PathDetailPage() {
                 goal={pageState.path.display_objective}
                 stages={pageState.stages}
                 practicedVideoIds={pageState.progress?.practicedVideoIds || []}
+                watchedCompletedVideoIds={watchedCompletedIds}
                 completedStageIds={pageState.progress?.completedStageIds || []}
                 selectedPathVideoId={
                   pageState.progress?.continueTarget?.pathVideoId || null
@@ -1102,6 +1157,9 @@ export default function PathDetailPage() {
                               pageState.progress?.practicedVideoIds.includes(
                                 video.id
                               ) || false;
+                            const finished = watchedCompletedIds.includes(
+                              video.id
+                            );
                             return (
                               <li
                                 key={video.id}
@@ -1116,9 +1174,21 @@ export default function PathDetailPage() {
                                     )}
                                     className="min-w-0 flex-1 transition hover:text-amber-50"
                                   >
-                                    <p className="font-medium text-stone-100">
-                                      {video.title}
-                                      {practiced ? ' · practiced' : ''}
+                                    <p className="flex items-start gap-2 font-medium text-stone-100">
+                                      {finished ? (
+                                        <span
+                                          className="mt-0.5 shrink-0 text-emerald-400"
+                                          aria-label="Finished"
+                                          title="Finished"
+                                        >
+                                          ✓
+                                        </span>
+                                      ) : null}
+                                      <span className="min-w-0">
+                                        {video.title}
+                                        {finished ? ' · finished' : ''}
+                                        {practiced ? ' · practiced' : ''}
+                                      </span>
                                     </p>
                                     <p className="mt-1 text-sm text-stone-500">
                                       {video.channel_title || 'YouTube'}

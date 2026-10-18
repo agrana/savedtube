@@ -111,10 +111,20 @@ export function YouTubePlayer({
   const [playerId] = useState(
     () => `youtube-player-${Math.random().toString(36).substr(2, 9)}`
   );
+  const onEndRef = useRef(onEnd);
+  const onPlayRef = useRef(onPlay);
+  const onPauseRef = useRef(onPause);
+  const onErrorRef = useRef(onError);
+  onEndRef.current = onEnd;
+  onPlayRef.current = onPlay;
+  onPauseRef.current = onPause;
+  onErrorRef.current = onError;
 
   // Keep the creation guard synchronous so Strict Mode's effect replay cannot
   // construct a second player for the same video before React applies state.
   const lastVideoIdRef = useRef('');
+  // Invalidate callbacks from a destroyed / superseded player instance.
+  const playerGenerationRef = useRef(0);
 
   // Interval playback state
   const [currentIntervalIndex, setCurrentIntervalIndex] = useState(0);
@@ -164,11 +174,26 @@ export function YouTubePlayer({
     // Only create a new player if the video ID changed or no player exists.
     if (!playerRef.current || lastVideoIdRef.current !== videoId) {
       if (playerRef.current) {
-        playerRef.current.destroy();
+        playerGenerationRef.current += 1;
+        try {
+          playerRef.current.destroy();
+        } catch {
+          // Ignore destroy races during Strict Mode remount.
+        }
+        playerRef.current = null;
+      }
+
+      // Clear host node so a superseded iframe cannot linger beside the next
+      // player after Strict Mode mount → unmount → mount.
+      const host = document.getElementById(playerId);
+      if (host) {
+        host.replaceChildren();
       }
 
       lastVideoIdRef.current = videoId;
       setIsPlayerReady(false);
+      const generation = playerGenerationRef.current + 1;
+      playerGenerationRef.current = generation;
 
       try {
         // Create new player with distraction-minimizing parameters
@@ -191,6 +216,7 @@ export function YouTubePlayer({
           },
           events: {
             onReady: () => {
+              if (generation !== playerGenerationRef.current) return;
               setIsPlayerReady(true);
               console.log('YouTube player ready');
               if (autoPlay) {
@@ -198,17 +224,19 @@ export function YouTubePlayer({
               }
             },
             onStateChange: (event) => {
+              if (generation !== playerGenerationRef.current) return;
               if (event.data === window.YT.PlayerState.ENDED) {
-                onEnd?.();
+                onEndRef.current?.();
               } else if (event.data === window.YT.PlayerState.PLAYING) {
-                onPlay?.();
+                onPlayRef.current?.();
               } else if (event.data === window.YT.PlayerState.PAUSED) {
-                onPause?.();
+                onPauseRef.current?.();
               }
             },
             onError: (event) => {
+              if (generation !== playerGenerationRef.current) return;
               console.error('YouTube player error:', event);
-              onError?.(event);
+              onErrorRef.current?.(event);
             },
           },
         });
@@ -221,22 +249,37 @@ export function YouTubePlayer({
         );
       }
     }
-  }, [
-    isYouTubeAPIReady,
-    videoId,
-    playerId,
-    onEnd,
-    onPlay,
-    onPause,
-    onError,
-    autoPlay,
-  ]);
+  }, [isYouTubeAPIReady, videoId, playerId, autoPlay]);
+
+  // Unmount / Strict Mode replay: invalidate callbacks, destroy the instance,
+  // and clear the host so a second mount cannot stack iframes.
+  useEffect(() => {
+    return () => {
+      playerGenerationRef.current += 1;
+      if (playerRef.current) {
+        try {
+          playerRef.current.destroy();
+        } catch {
+          // Ignore destroy races during Strict Mode remount.
+        }
+        playerRef.current = null;
+      }
+      lastVideoIdRef.current = '';
+      const host = document.getElementById(playerId);
+      if (host) {
+        host.replaceChildren();
+      }
+    };
+  }, [playerId]);
 
   useEffect(() => {
     if (!isPlayerReady || !playerRef.current) return;
     if (seekToSeconds === null || typeof seekToSeconds === 'undefined') return;
 
+    const generation = playerGenerationRef.current;
     playerRef.current.seekTo(seekToSeconds, true);
+    if (generation !== playerGenerationRef.current) return;
+
     if (playAfterSeek) {
       playerRef.current.playVideo();
     }

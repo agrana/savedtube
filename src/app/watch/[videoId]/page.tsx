@@ -14,6 +14,24 @@ import { VideoInterval } from '../../../types/intervals';
 import type { PathWatchContext } from '@/lib/path-links';
 import { buildPathWatchHref } from '@/lib/path-links';
 import { isPublicDemoPathId, loadDemoWatchContext } from '@/lib/demo-path';
+import {
+  buildPlaybackWatchIdentityKey,
+  clearPathResumeCursor,
+  clearVideoResumePosition,
+  isPathResumeIntent,
+  isPathVideoWatchedCompleted,
+  markPathVideoWatchedCompleted,
+  persistResumeForWatchIdentity,
+  planWatchIdentityTransition,
+  playbackWatchIdentitiesEqual,
+  readWatchedCompletedIds,
+  resolvePlaybackAccountScope,
+  resolveWatchStartSeek,
+  shouldAutoAdvanceOnEnded,
+  shouldHandlePlaybackEndedForIdentity,
+  shouldMarkWatchedOnEnded,
+  type PlaybackWatchIdentity,
+} from '@/lib/path-playback-resume';
 
 interface PlaylistItem {
   id: string;
@@ -82,28 +100,6 @@ const mergeLocalIntervalNames = (
   }));
 };
 
-const getResumePositionKey = (videoId: string) =>
-  `savedtube:resume-position:${videoId}`;
-
-const readResumePosition = (videoId: string): number | null => {
-  if (typeof window === 'undefined') return null;
-  const value = Number(
-    window.localStorage.getItem(getResumePositionKey(videoId))
-  );
-  return Number.isFinite(value) && value > 3 ? value : null;
-};
-
-const saveResumePosition = (videoId: string, time: number) => {
-  if (typeof window === 'undefined' || !Number.isFinite(time) || time <= 3) {
-    return;
-  }
-
-  window.localStorage.setItem(
-    getResumePositionKey(videoId),
-    String(Math.floor(time))
-  );
-};
-
 const getBookmarkKey = (videoId: string) => `savedtube:bookmarks:${videoId}`;
 
 interface VideoBookmark {
@@ -166,9 +162,13 @@ export default function WatchPage() {
   const playlistId = searchParams.get('playlistId');
   const pathId = searchParams.get('pathId');
   const pathVideoId = searchParams.get('pathVideoId');
+  const resumeIntent = isPathResumeIntent(searchParams.get('resume'));
   const mode =
     pathId && pathVideoId ? 'path' : playlistId ? 'playlist' : 'standalone';
   const hasSession = status === 'authenticated';
+  const accountScope = resolvePlaybackAccountScope(
+    (session?.user as { id?: string } | undefined)?.id
+  );
 
   const [playlistItems, setPlaylistItems] = useState<PlaylistItem[]>([]);
   const [pathContext, setPathContext] = useState<PathWatchContext | null>(null);
@@ -177,6 +177,10 @@ export default function WatchPage() {
   const [error, setError] = useState<string | null>(null);
   const [autoplayEnabled, setAutoplayEnabled] = useState(true);
   const [isMarkingPracticed, setIsMarkingPracticed] = useState(false);
+  const [watchedCompletedIds, setWatchedCompletedIds] = useState<string[]>([]);
+  const playbackEndedRef = useRef(false);
+  const resumeSeekGuardRef = useRef(false);
+  const resumeSeekGuardTimeoutRef = useRef<number | null>(null);
 
   // Interval management state
   const [intervals, setIntervals] = useState<VideoInterval[]>([]);
@@ -188,11 +192,13 @@ export default function WatchPage() {
   const [resumeRequest, setResumeRequest] = useState<{
     time: number;
     token: number;
+    identityKey: string;
   } | null>(null);
   const [activeIntervalId, setActiveIntervalId] = useState<string | null>(null);
   const [seekRequest, setSeekRequest] = useState<{
     time: number;
     token: number;
+    identityKey: string;
   } | null>(null);
   const [playThrough, setPlayThrough] = useState<{ startIndex: number } | null>(
     null
@@ -583,46 +589,213 @@ export default function WatchPage() {
     router,
   ]);
 
+  const watchedCompleted =
+    mode === 'path' && pathId && pathVideoId
+      ? watchedCompletedIds.includes(pathVideoId) ||
+        isPathVideoWatchedCompleted(accountScope, pathId, pathVideoId)
+      : false;
+
+  const watchIdentity = useMemo<PlaybackWatchIdentity>(
+    () => ({
+      youtubeVideoId: videoId,
+      pathId: mode === 'path' ? pathId : null,
+      pathVideoId: mode === 'path' ? pathVideoId : null,
+    }),
+    [mode, pathId, pathVideoId, videoId]
+  );
+  const watchIdentityKey = buildPlaybackWatchIdentityKey(watchIdentity);
+  const watchIdentityRef = useRef(watchIdentity);
+  const watchedCompletedRef = useRef(watchedCompleted);
+  const [identityEpoch, setIdentityEpoch] = useState(watchIdentityKey);
+  const pendingLeaveRef = useRef<{
+    identity: PlaybackWatchIdentity;
+    time: number;
+    playbackEnded: boolean;
+    watchedCompleted: boolean;
+  } | null>(null);
+
+  // Capture leave snapshot before zeroing time so cleanup cannot write the
+  // previous timestamp onto the next membership (including same YouTube id).
+  if (identityEpoch !== watchIdentityKey) {
+    pendingLeaveRef.current = {
+      identity: watchIdentityRef.current,
+      time: currentTimeRef.current,
+      playbackEnded: playbackEndedRef.current,
+      watchedCompleted: watchedCompletedRef.current,
+    };
+    currentTimeRef.current = 0;
+    playbackEndedRef.current = false;
+    setIdentityEpoch(watchIdentityKey);
+    setCurrentTime(0);
+    setResumeRequest(null);
+    setSeekRequest(null);
+  }
+
+  watchIdentityRef.current = watchIdentity;
+  watchedCompletedRef.current = watchedCompleted;
+
+  const persistPlaybackResume = useCallback((time: number) => {
+    persistResumeForWatchIdentity({
+      identity: watchIdentityRef.current,
+      time,
+      playbackEnded: playbackEndedRef.current,
+      watchedCompleted: watchedCompletedRef.current,
+    });
+  }, []);
+
   useEffect(() => {
-    const restoreResumePosition = () => {
-      const savedPosition = readResumePosition(videoId);
-      setResumeRequest(
-        savedPosition === null
-          ? null
-          : { time: savedPosition, token: Date.now() }
-      );
+    if (mode !== 'path' || !pathId) {
+      setWatchedCompletedIds([]);
+      return;
+    }
+    setWatchedCompletedIds([...readWatchedCompletedIds(accountScope, pathId)]);
+  }, [mode, pathId, accountScope, pathVideoId]);
+
+  useEffect(() => {
+    const leave = pendingLeaveRef.current;
+    pendingLeaveRef.current = null;
+
+    playbackEndedRef.current = false;
+    resumeSeekGuardRef.current = false;
+    if (resumeSeekGuardTimeoutRef.current !== null) {
+      window.clearTimeout(resumeSeekGuardTimeoutRef.current);
+      resumeSeekGuardTimeoutRef.current = null;
+    }
+
+    const lessonFinished =
+      mode === 'path' && pathId && pathVideoId
+        ? isPathVideoWatchedCompleted(accountScope, pathId, pathVideoId)
+        : false;
+
+    const applyStartSeek = () => {
+      const finishedNow =
+        mode === 'path' && pathId && pathVideoId
+          ? isPathVideoWatchedCompleted(accountScope, pathId, pathVideoId)
+          : false;
+      const startSeek = resolveWatchStartSeek({
+        youtubeVideoId: videoId,
+        pathId,
+        pathVideoId,
+        resumeIntent,
+        watchedCompleted: finishedNow,
+      });
+      const token = Date.now();
+      if (startSeek.restorePaused) {
+        setResumeRequest({
+          time: startSeek.time,
+          token,
+          identityKey: watchIdentityKey,
+        });
+        setSeekRequest(null);
+      } else {
+        // Explicit 0 (or non-restore start) — never rely on null seek when the
+        // player instance could be reused across memberships.
+        setResumeRequest(null);
+        setSeekRequest({
+          time: startSeek.time,
+          token,
+          identityKey: watchIdentityKey,
+        });
+      }
     };
 
-    restoreResumePosition();
-    setBookmarks(readBookmarks(videoId));
-    window.addEventListener('pageshow', restoreResumePosition);
+    if (leave) {
+      const transition = planWatchIdentityTransition({
+        previous: leave.identity,
+        previousTime: leave.time,
+        previousPlaybackEnded: leave.playbackEnded,
+        previousWatchedCompleted: leave.watchedCompleted,
+        next: watchIdentity,
+        nextWatchedCompleted: lessonFinished,
+        resumeIntent,
+      });
+      const token = Date.now();
+      if (transition.startSeek.restorePaused) {
+        setResumeRequest({
+          time: transition.startSeek.time,
+          token,
+          identityKey: watchIdentityKey,
+        });
+        setSeekRequest(null);
+      } else {
+        setResumeRequest(null);
+        setSeekRequest({
+          time: transition.startSeek.time,
+          token,
+          identityKey: watchIdentityKey,
+        });
+      }
+    } else {
+      applyStartSeek();
+    }
 
-    return () => window.removeEventListener('pageshow', restoreResumePosition);
-  }, [videoId]);
+    setBookmarks(readBookmarks(videoId));
+    window.addEventListener('pageshow', applyStartSeek);
+
+    return () => {
+      window.removeEventListener('pageshow', applyStartSeek);
+      if (resumeSeekGuardTimeoutRef.current !== null) {
+        window.clearTimeout(resumeSeekGuardTimeoutRef.current);
+        resumeSeekGuardTimeoutRef.current = null;
+      }
+      resumeSeekGuardRef.current = false;
+    };
+  }, [
+    watchIdentity,
+    watchIdentityKey,
+    videoId,
+    pathId,
+    pathVideoId,
+    resumeIntent,
+    mode,
+    accountScope,
+  ]);
 
   useEffect(() => {
     currentTimeRef.current = currentTime;
   }, [currentTime]);
 
-  // Remember where the viewer actually left the video. The interval keeps the
-  // position durable during route changes, tab closes, and browser crashes;
-  // the cleanup/pagehide handlers cover the final few seconds.
+  // Remember where the viewer actually left unfinished videos. Completed
+  // lessons never re-store near-end resume (they reopen at 0).
   useEffect(() => {
     if (mode !== 'path' || typeof window === 'undefined') return;
 
+    const identityForEffect = watchIdentity;
+
     const persistPosition = () => {
-      saveResumePosition(videoId, currentTimeRef.current);
+      if (
+        !playbackWatchIdentitiesEqual(
+          identityForEffect,
+          watchIdentityRef.current
+        )
+      ) {
+        return;
+      }
+      persistResumeForWatchIdentity({
+        identity: identityForEffect,
+        time: currentTimeRef.current,
+        playbackEnded: playbackEndedRef.current,
+        watchedCompleted: watchedCompletedRef.current,
+      });
     };
 
     const persistenceTimer = window.setInterval(persistPosition, 2000);
     window.addEventListener('pagehide', persistPosition);
 
     return () => {
-      persistPosition();
+      // Identity already advanced — leave snapshot owns the unfinished save.
+      if (
+        playbackWatchIdentitiesEqual(
+          identityForEffect,
+          watchIdentityRef.current
+        )
+      ) {
+        persistPosition();
+      }
       window.clearInterval(persistenceTimer);
       window.removeEventListener('pagehide', persistPosition);
     };
-  }, [mode, videoId]);
+  }, [mode, watchIdentity, watchIdentityKey]);
 
   const addBookmark = () => {
     if (typeof window === 'undefined' || currentTime <= 0) return;
@@ -667,7 +840,11 @@ export default function WatchPage() {
   };
 
   const jumpToBookmark = (bookmark: VideoBookmark) => {
-    setSeekRequest({ time: bookmark.time, token: Date.now() });
+    setSeekRequest({
+      time: bookmark.time,
+      token: Date.now(),
+      identityKey: watchIdentityKey,
+    });
   };
 
   useEffect(() => {
@@ -696,7 +873,7 @@ export default function WatchPage() {
 
   useEffect(() => {
     setPlayThrough(null);
-  }, [videoId]);
+  }, [watchIdentityKey]);
 
   const goToNext = useCallback(() => {
     if (mode === 'path' && pathContext?.next && pathId) {
@@ -872,8 +1049,14 @@ export default function WatchPage() {
   const pathNavButtonClassName =
     'rounded-full border border-white/10 px-4 py-2 text-sm text-stone-200 transition hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#080806] disabled:cursor-not-allowed disabled:opacity-40';
 
+  const activeResumeRequest =
+    resumeRequest?.identityKey === watchIdentityKey ? resumeRequest : null;
+  const activeSeekRequest =
+    seekRequest?.identityKey === watchIdentityKey ? seekRequest : null;
+
   const player = (
     <YouTubePlayer
+      key={watchIdentityKey}
       videoId={videoId}
       autoPlay={autoplayEnabled}
       intervals={sortedIntervals.map(
@@ -884,23 +1067,86 @@ export default function WatchPage() {
       )}
       loopEnabled={loopEnabled}
       onEnd={() => {
-        // Playback end advances navigation only — never marks mastery.
-        if (hasNext && autoplayEnabled && intervals.length === 0) {
+        // Spurious ENDED after a near-end resume seek must not mark finished
+        // or auto-advance. Interval loop/seek ends never reach this handler.
+        // Drop ENDED that belongs to a previous membership/player generation.
+        if (
+          !shouldHandlePlaybackEndedForIdentity({
+            eventIdentity: watchIdentity,
+            activeIdentity: watchIdentityRef.current,
+            resumeSeekGuardActive: resumeSeekGuardRef.current,
+          })
+        ) {
+          return;
+        }
+
+        playbackEndedRef.current = true;
+        clearVideoResumePosition(videoId);
+        if (mode === 'path' && pathId) {
+          clearPathResumeCursor(pathId);
+        }
+
+        if (
+          mode === 'path' &&
+          pathId &&
+          pathVideoId &&
+          shouldMarkWatchedOnEnded({
+            resumeSeekGuardActive: false,
+            hasPathMembership: true,
+          })
+        ) {
+          const nextIds = markPathVideoWatchedCompleted(
+            accountScope,
+            pathId,
+            pathVideoId
+          );
+          setWatchedCompletedIds([...nextIds]);
+        }
+
+        if (
+          shouldAutoAdvanceOnEnded({
+            autoplayEnabled,
+            hasNext,
+            hasPracticeIntervals: intervals.length > 0,
+            resumeSeekGuardActive: false,
+          })
+        ) {
           goToNext();
         }
+      }}
+      onPlay={() => {
+        // Natural ENDED suppresses persist until the learner replays.
+        // Watched completion remains; finished lessons still start at 0.
+        playbackEndedRef.current = false;
       }}
       onIntervalChange={(index) => {
         const interval = sortedIntervals[index];
         setActiveIntervalId(interval?.id ?? null);
       }}
       onCurrentTimeUpdate={setCurrentTime}
-      onPause={() => saveResumePosition(videoId, currentTimeRef.current)}
-      seekToSeconds={resumeRequest?.time ?? seekRequest?.time ?? null}
-      seekToToken={resumeRequest?.token ?? seekRequest?.token}
-      playAfterSeek={resumeRequest === null}
+      onPause={() => persistPlaybackResume(currentTimeRef.current)}
+      seekToSeconds={
+        activeResumeRequest?.time ?? activeSeekRequest?.time ?? null
+      }
+      seekToToken={activeResumeRequest?.token ?? activeSeekRequest?.token}
+      playAfterSeek={activeResumeRequest === null}
       onSeekComplete={() => {
-        setResumeRequest(null);
-        setSeekRequest(null);
+        if (activeResumeRequest !== null) {
+          if (resumeSeekGuardTimeoutRef.current !== null) {
+            window.clearTimeout(resumeSeekGuardTimeoutRef.current);
+          }
+          resumeSeekGuardRef.current = true;
+          resumeSeekGuardTimeoutRef.current = window.setTimeout(() => {
+            resumeSeekGuardRef.current = false;
+            resumeSeekGuardTimeoutRef.current = null;
+          }, 1500);
+        }
+        setResumeRequest((current) =>
+          current?.identityKey === watchIdentityKey ? null : current
+        );
+        setSeekRequest((current) =>
+          current?.identityKey === watchIdentityKey ? null : current
+        );
       }}
       playThroughIntervals={playThrough !== null}
       playThroughStartIndex={playThrough?.startIndex ?? 0}
@@ -1013,8 +1259,17 @@ export default function WatchPage() {
                   </p>
                 ) : null}
               </div>
-              <h1 className="mt-3 text-lg font-medium leading-snug tracking-[-0.02em] text-stone-50 sm:text-xl">
-                {displayTitle}
+              <h1 className="mt-3 flex items-start gap-2 text-lg font-medium leading-snug tracking-[-0.02em] text-stone-50 sm:text-xl">
+                {watchedCompleted ? (
+                  <span
+                    className="mt-1 inline-flex shrink-0 font-mono text-sm text-emerald-400"
+                    aria-label="Finished"
+                    title="Finished"
+                  >
+                    ✓
+                  </span>
+                ) : null}
+                <span className="min-w-0">{displayTitle}</span>
               </h1>
               <p className="mt-1.5 text-sm text-stone-500">{displayChannel}</p>
               {pathContext.stageTitle ? (
@@ -1042,6 +1297,52 @@ export default function WatchPage() {
                   Next
                 </button>
               </div>
+              {pathContext.sequence.length > 0 ? (
+                <ol
+                  className="mt-5 space-y-1.5 border-t border-white/[0.06] pt-4"
+                  aria-label="Watch sequence"
+                >
+                  {pathContext.sequence.map((item, index) => {
+                    const itemFinished = watchedCompletedIds.includes(
+                      item.pathVideoId
+                    );
+                    const isCurrent =
+                      item.pathVideoId === pathContext.pathVideoId;
+                    return (
+                      <li key={item.pathVideoId}>
+                        <Link
+                          href={pathWatchHref(
+                            item.youtubeVideoId,
+                            pathContext.pathId,
+                            item.pathVideoId
+                          )}
+                          className={`flex items-start gap-2 rounded-xl px-2 py-1.5 text-sm transition hover:bg-white/[0.04] ${
+                            isCurrent
+                              ? 'bg-white/[0.05] text-amber-50'
+                              : 'text-stone-300'
+                          }`}
+                          aria-current={isCurrent ? 'true' : undefined}
+                        >
+                          <span
+                            className={`mt-0.5 w-4 shrink-0 text-center font-mono text-xs ${
+                              itemFinished
+                                ? 'text-emerald-400'
+                                : 'text-stone-600'
+                            }`}
+                            aria-hidden={!itemFinished}
+                            aria-label={itemFinished ? 'Finished' : undefined}
+                          >
+                            {itemFinished ? '✓' : index + 1}
+                          </span>
+                          <span className="min-w-0 break-words leading-snug">
+                            {item.title}
+                          </span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ol>
+              ) : null}
               {!isPublicDemoWatch ? (
                 <div className="mt-5 space-y-4 border-t border-white/[0.06] pt-4">
                   <div className="flex flex-wrap items-center gap-3">

@@ -252,6 +252,9 @@ describe('demo follow helpers', () => {
     assert.ok(context);
     assert.equal(context.pathId, DEMO_PATH_ID);
     assert.equal(context.practiced, false);
+    assert.ok(Array.isArray(context.sequence));
+    assert.ok(context.sequence.length > 0);
+    assert.equal(context.sequence[0].pathVideoId, first.id);
     assert.match(context.returnHref, /^\/#demo-video-/);
     assert.equal(isPublicDemoPathId(DEMO_PATH_ID), true);
     assert.equal(
@@ -286,7 +289,11 @@ describe('logged-out route behavior', () => {
       /if \(status === 'loading' \|\| isLoading\)/
     );
     assert.match(watchPage, /pageshow/);
-    assert.match(watchPage, /onPause=\{\(\) => saveResumePosition/);
+    assert.match(watchPage, /onPause=\{\(\) => persistPlaybackResume/);
+    assert.match(watchPage, /resolveWatchStartSeek/);
+    assert.match(watchPage, /planWatchIdentityTransition/);
+    assert.match(watchPage, /key=\{watchIdentityKey\}/);
+    assert.match(watchPage, /markPathVideoWatchedCompleted/);
     assert.match(watchPage, /callbackUrl|router\.push\('\/'\)/);
   });
 

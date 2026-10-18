@@ -2,6 +2,17 @@
 
 This file records user-visible product changes and meaningful engineering changes. Each completed feature slice gets an entry when it is delivered. Deferred ideas and unfinished work belong in [`backlog.md`](backlog.md).
 
+## 2026-10-18
+
+### Added
+
+- Path lessons watched to a natural YouTube end keep a persistent green finished checkmark on the path map, lesson list, and watch sequence. Watched completion is device-local (account + path scoped in browser storage), separate from practiced/mastery, and independent of practice-interval loop ends.
+
+### Fixed
+
+- Finished lessons reopen at 0:00; unfinished lessons still resume the last saved position. Near-end resume seeks no longer spuriously mark finished or auto-skip to the next lesson. Explicit map/list selection always opens the requested video, even when it is already finished. Resume path keeps a dedicated resume-intent target.
+- Watch playback identity (YouTube id + path membership) now gates resume seeks, leave-save, and ENDED handling so a prior timestamp or completion cannot apply to the next lesson — including the same YouTube id under a different path membership. Finished navigation always seeks to 0:00 explicitly; the player remounts per membership.
+
 ## 2026-10-17
 
 ### Fixed

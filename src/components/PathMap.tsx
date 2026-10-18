@@ -42,7 +42,9 @@ const STAGE_HEADING =
 const LESSON_BASE =
   'absolute box-border overflow-hidden rounded-xl border px-3 py-2 text-left outline-none transition motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-amber-200/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#080806]';
 
-function stageHeadingClassName(node: Extract<PathMapNode, { kind: 'stage' }>): string {
+function stageHeadingClassName(
+  node: Extract<PathMapNode, { kind: 'stage' }>
+): string {
   if (node.isCurrent) {
     return `${STAGE_HEADING} text-amber-100/90 hover:text-amber-50`;
   }
@@ -52,14 +54,30 @@ function stageHeadingClassName(node: Extract<PathMapNode, { kind: 'stage' }>): s
   return `${STAGE_HEADING} text-stone-500 hover:text-stone-300`;
 }
 
-function lessonClassName(node: Extract<PathMapNode, { kind: 'video' }>): string {
+function lessonClassName(
+  node: Extract<PathMapNode, { kind: 'video' }>
+): string {
   const selected = node.selected
     ? 'border-amber-200/55 bg-amber-300/18 text-amber-50 shadow-[0_0_0_1px_rgba(251,191,36,0.14)]'
     : node.recommended
       ? 'border-amber-200/40 bg-amber-300/12 text-amber-50'
       : 'border-white/10 bg-[#12120f] text-stone-100 hover:border-amber-200/30 hover:text-amber-50';
   const practiced = node.practiced ? 'ring-1 ring-emerald-300/30' : '';
-  return `${LESSON_BASE} ${selected} ${practiced}`;
+  const finished = node.watchedCompleted ? 'border-emerald-400/35' : '';
+  return `${LESSON_BASE} ${selected} ${practiced} ${finished}`;
+}
+
+function FinishedCheck({ label = 'Finished' }: { label?: string }) {
+  return (
+    <span
+      className="inline-flex shrink-0 items-center gap-1 font-mono text-[10px] uppercase tracking-[0.14em] text-emerald-400"
+      aria-label={label}
+      title={label}
+    >
+      <span aria-hidden="true">✓</span>
+      <span className="sr-only">{label}</span>
+    </span>
+  );
 }
 
 function bandClassName(band: PathMapStageBand): string {
@@ -139,9 +157,12 @@ function StageDetailsPanel({
             lesson.selected || lesson.recommended
               ? 'border-amber-200/40 bg-amber-300/10 text-amber-50'
               : 'border-white/8 bg-white/[0.03] text-stone-100 hover:border-amber-200/25'
-          } ${lesson.practiced ? 'ring-1 ring-emerald-300/25' : ''}`;
+          } ${lesson.practiced ? 'ring-1 ring-emerald-300/25' : ''} ${
+            lesson.watchedCompleted ? 'border-emerald-400/35' : ''
+          }`;
           const meta = [
             lesson.recommended ? 'Recommended next' : null,
+            lesson.watchedCompleted ? 'Finished' : null,
             lesson.practiced ? 'Practiced' : null,
           ]
             .filter(Boolean)
@@ -161,8 +182,9 @@ function StageDetailsPanel({
                     })
                   }
                 >
-                  <span className="min-w-0 break-words font-medium leading-snug">
-                    {lesson.label}
+                  <span className="flex min-w-0 items-start gap-2 break-words font-medium leading-snug">
+                    {lesson.watchedCompleted ? <FinishedCheck /> : null}
+                    <span className="min-w-0">{lesson.label}</span>
                   </span>
                   {meta ? (
                     <span className="shrink-0 text-xs text-amber-100/70">
@@ -181,8 +203,9 @@ function StageDetailsPanel({
                 aria-label={lesson.ariaLabel}
                 className={lessonClass}
               >
-                <span className="min-w-0 break-words font-medium leading-snug">
-                  {lesson.label}
+                <span className="flex min-w-0 items-start gap-2 break-words font-medium leading-snug">
+                  {lesson.watchedCompleted ? <FinishedCheck /> : null}
+                  <span className="min-w-0">{lesson.label}</span>
                 </span>
                 {meta ? (
                   <span className="shrink-0 text-xs text-amber-100/70">
@@ -229,7 +252,10 @@ function MapCanvas({
   onVideoSelect?: PathMapProps['onVideoSelect'];
 }) {
   return (
-    <div className={className} style={{ width: layout.width, maxWidth: '100%' }}>
+    <div
+      className={className}
+      style={{ width: layout.width, maxWidth: '100%' }}
+    >
       <div
         className="relative mx-auto"
         style={{ width: layout.width, height: layout.height }}
@@ -306,6 +332,7 @@ function MapCanvas({
           }
           const meta = [
             node.recommended ? 'next' : null,
+            node.watchedCompleted ? 'finished' : null,
             node.practiced ? 'practiced' : null,
           ]
             .filter(Boolean)
@@ -326,8 +353,9 @@ function MapCanvas({
                   })
                 }
               >
-                <span className="block break-words text-sm font-medium leading-snug line-clamp-2">
-                  {node.label}
+                <span className="flex items-start gap-1.5 break-words text-sm font-medium leading-snug line-clamp-2">
+                  {node.watchedCompleted ? <FinishedCheck /> : null}
+                  <span className="min-w-0">{node.label}</span>
                 </span>
                 <span className="mt-1 block truncate text-xs text-stone-500">
                   {node.channelTitle || 'YouTube'}
@@ -345,8 +373,9 @@ function MapCanvas({
               className={lessonClassName(node)}
               style={style}
             >
-              <span className="block break-words text-sm font-medium leading-snug line-clamp-2">
-                {node.label}
+              <span className="flex items-start gap-1.5 break-words text-sm font-medium leading-snug line-clamp-2">
+                {node.watchedCompleted ? <FinishedCheck /> : null}
+                <span className="min-w-0">{node.label}</span>
               </span>
               <span className="mt-1 block truncate text-xs text-stone-500">
                 {node.channelTitle || 'YouTube'}
@@ -459,6 +488,7 @@ export default function PathMap({
   goal,
   stages,
   practicedVideoIds,
+  watchedCompletedVideoIds,
   completedStageIds,
   selectedPathVideoId,
   selectedStageId,
@@ -475,6 +505,7 @@ export default function PathMap({
     goal,
     stages,
     practicedVideoIds,
+    watchedCompletedVideoIds,
     completedStageIds,
     selectedPathVideoId,
     selectedStageId,

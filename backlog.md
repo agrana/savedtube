@@ -4,8 +4,9 @@ This is the canonical list of unfinished, deferred, and deliberately pending Sav
 
 ## Next product follow-ups
 
-- [ ] Run a live browser/mobile verification pass for automatic resume and named bookmarks.
+- [ ] Run a live browser/mobile verification pass for automatic resume, named bookmarks, and finished-check persistence on return to the path map (device-local watched completion is not cross-device until a sync decision).
 - [ ] Decide whether bookmarks should remain browser-local or sync through the authenticated backend for cross-device access.
+- [ ] Decide whether watched-to-end completion should stay browser-local or sync through authenticated path progress for cross-device checkmarks (keep separate from practiced/mastery).
 - [ ] Add automated coverage for bookmark creation, naming, renaming, jumping, deletion, reload persistence, and video isolation.
 - [ ] Review whether bookmark access belongs anywhere beyond the watch page, such as path detail or learner progress surfaces.
 
@@ -28,7 +29,7 @@ This is the canonical list of unfinished, deferred, and deliberately pending Sav
 - [ ] Make stage purpose, expected outcome, and estimated effort more explicit.
 - [ ] Optionally let learners edit Level / Max length / Style after create without regenerating from scratch.
 - [ ] Consider a dedicated preferences column if background dual-use (legacy text vs structured JSON) becomes operationally awkward.
-- [ ] Map review slice 2: restore and clearly present the learner's saved position on return; separate implementation and human review gate.
+- [ ] Map review slice 2 follow-up: human visual review of finished checkmarks + resume-at-zero vs unfinished resume on path map / watch sequence after the 2026-10-18 playback slice; celebrate cues remain out of scope.
 - [ ] Map review slice 3: restrained completion / progress celebration cues; separate implementation and human review gate.
 - [ ] Polish long desktop stage headings and cramped lesson metadata identified in slice 1 visual review.
 - [ ] Explore richer path-map relationships and navigation beyond the map-first sequential lesson spine.

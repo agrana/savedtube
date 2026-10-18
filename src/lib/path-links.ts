@@ -12,6 +12,12 @@ export function buildPathWatchHref(
   return `/watch/${youtubeVideoId}?${params.toString()}`;
 }
 
+export type PathWatchSequenceItem = {
+  pathVideoId: string;
+  youtubeVideoId: string;
+  title: string;
+};
+
 export type PathWatchContext = {
   pathId: string;
   pathTitle: string;
@@ -24,6 +30,8 @@ export type PathWatchContext = {
   practiced: boolean;
   position: number;
   total: number;
+  /** Ordered playable lessons for the watch-sequence checklist. */
+  sequence: PathWatchSequenceItem[];
   previous: {
     pathVideoId: string;
     youtubeVideoId: string;
